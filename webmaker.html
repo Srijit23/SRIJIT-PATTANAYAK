@@ -1,0 +1,1836 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=1440, initial-scale=1">
+    <title>Airake</title>
+		<link rel="icon" type="image/svg+xml" href="/logo.png" />
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Font Awesome -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;1,400&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&display=swap');
+        
+        :root {
+            --canvas-scale: 1;
+        }
+
+        body { 
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; 
+            overflow: hidden; 
+            background-color: #f1f5f9;
+        }
+        
+        /* The Workspace Wrapper */
+        #canvas-wrapper {
+            background-color: #cbd5e1; 
+            overflow-x: hidden; 
+            overflow-y: auto;
+            position: relative;
+            box-shadow: inset 0 0 30px rgba(0,0,0,0.05);
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+        }
+        
+        /* The Visual Scaler Container */
+        #canvas-scaler {
+            position: relative;
+            margin-top: 3rem;
+            margin-bottom: 3rem;
+            transition: width 0.3s ease, height 0.3s ease, margin 0.3s ease;
+        }
+
+        /* The Actual Website Canvas */
+        #canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            transform-origin: top left;
+            width: 1440px; 
+            height: 3000px; 
+            background-color: #ffffff;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25), 0 0 15px rgba(0,0,0,0.05);
+            overflow: hidden; /* Restored to prevent builder overflow */
+            background-image: 
+                linear-gradient(to right, #f1f5f9 1px, transparent 1px),
+                linear-gradient(to bottom, #f1f5f9 1px, transparent 1px);
+            background-size: 20px 20px;
+        }
+
+        /* Preview Mode Enhancements */
+        body.preview-mode #canvas-wrapper { background-color: #ffffff; }
+        body.preview-mode #canvas {
+            background-image: none;
+            box-shadow: none;
+            border: none;
+        }
+        body.preview-mode .canvas-element { outline: none !important; }
+        body.preview-mode .canvas-element:hover { outline: none !important; }
+        body.preview-mode .selected-node { outline: none !important; box-shadow: none !important; }
+        body.preview-mode .smart-guide { display: none !important; }
+
+        /* Canvas Label */
+        #canvas-label {
+            position: absolute;
+            top: -24px;
+            left: 0;
+            font-size: 11px;
+            font-weight: 700;
+            color: #64748b;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            pointer-events: none;
+        }
+
+        /* Empty Canvas State */
+        #canvas:empty::before {
+            content: 'Drag and drop components from the left sidebar anywhere onto the canvas.';
+            position: absolute;
+            top: 200px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: #94a3b8;
+            font-size: 1.125rem;
+            font-weight: 500;
+            pointer-events: none;
+            text-align: center;
+            border: 2px dashed #cbd5e1;
+            padding: 4rem;
+            border-radius: 1rem;
+            width: 80%;
+            background: rgba(255,255,255,0.8);
+        }
+
+        /* Canvas Elements - Absolute Placement & Sliding Physics */
+        .canvas-element {
+            position: absolute !important;
+            cursor: grab;
+            box-sizing: border-box;
+            user-select: none;
+            outline: 2px dashed transparent; 
+            outline-offset: 2px;
+            margin: 0 !important; 
+            transition: box-shadow 0.2s ease, top 0.3s ease-out, left 0.3s ease-out;
+        }
+
+        /* Full Bleed Physics: Locked securely to 1440px while editing to prevent overflow */
+        .is-full-bleed {
+            width: 1440px !important;
+            max-width: 1440px !important;
+            left: 0 !important;
+            transform: none !important;
+            cursor: ns-resize !important; 
+        }
+
+        .canvas-element.is-dragging {
+            transition: none !important;
+            cursor: grabbing !important;
+        }
+
+        /* Base z-index rules */
+        .canvas-element:not([data-type="floating-nav"]) { z-index: 10; }
+        .canvas-element[data-type="floating-nav"] { z-index: 100 !important; }
+
+        /* Elevation on hover/select */
+        .canvas-element:hover {
+            outline: 2px dashed #94a3b8;
+            z-index: 40;
+        }
+        .canvas-element.selected {
+            z-index: 50;
+            box-shadow: 0 10px 25px -5px rgba(0,0,0,0.1);
+            outline: 2px dashed #94a3b8;
+        }
+
+        .canvas-element *:hover {
+            outline: 2px dotted #60a5fa;
+            outline-offset: -2px;
+            cursor: cell;
+        }
+
+        .selected-node {
+            outline: 3px solid #3b82f6 !important;
+            outline-offset: -2px;
+            box-shadow: inset 0 0 0 2px rgba(255,255,255,0.5), 0 0 0 4px rgba(59, 130, 246, 0.2);
+            position: relative;
+            z-index: 51;
+        }
+
+        .smart-guide {
+            position: absolute;
+            background-color: #ec4899; 
+            z-index: 9999;
+            pointer-events: none;
+            display: none;
+        }
+        #guide-v { width: 1px; height: 100%; top: 0; left: 50%; }
+        #guide-h { width: 100%; height: 1px; left: 0; top: 50%; }
+
+        .canvas-element * { pointer-events: auto; }
+
+        .dragging-component { 
+            opacity: 0.8; 
+            transform: scale(0.95);
+            box-shadow: 0 10px 20px -5px rgba(0, 0, 0, 0.2);
+        }
+
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #94a3b8; border-radius: 4px; border: 2px solid transparent; background-clip: content-box;}
+        ::-webkit-scrollbar-thumb:hover { background-color: #64748b; }
+
+        .prop-input {
+            width: 100%;
+            background-color: #ffffff;
+            border: 1px solid #e2e8f0;
+            border-radius: 0.375rem;
+            padding: 0.5rem 0.6rem;
+            font-size: 0.75rem;
+            color: #1e293b;
+            transition: all 0.2s;
+            font-family: inherit;
+        }
+        .prop-input:focus {
+            outline: none;
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+        }
+        .prop-label {
+            display: block;
+            font-size: 0.65rem;
+            font-weight: 700;
+            color: #475569;
+            margin-bottom: 0.35rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+        .input-group { margin-bottom: 1rem; }
+        
+        .hover-link { cursor: pointer !important; transition: opacity 0.3s ease, transform 0.3s ease !important; }
+        .hover-link:hover { opacity: 0.7 !important; }
+
+        .sidebar-transition { transition: margin 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
+        .sidebar-left-collapsed { margin-left: -15rem !important; } /* Corresponds to w-60 */
+        .sidebar-right-collapsed { margin-right: -16rem !important; } /* Corresponds to w-64 */
+
+        .canvas-element.multi-selected {
+            outline: 2px dashed #3b82f6 !important;
+            z-index: 50;
+        }
+    </style>
+</head>
+<body class="flex flex-col h-screen text-slate-800">
+
+    <!-- Top Navigation -->
+    <header class="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-6 z-30 shadow-sm relative shrink-0">
+        <div class="flex items-center space-x-5">
+            <!-- Home Button -->
+            <a href="index.html" class="w-10 h-10 flex items-center justify-center bg-white border border-slate-200/70 rounded-xl shadow-[0_2px_8px_rgba(0,0,0,0.04)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.08)] hover:-translate-y-0.5 text-slate-500 hover:text-blue-600 transition-all duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-blue-500/20" title="Go to Home">
+                <i class="fas fa-home text-[1.1rem]"></i>
+            </a>
+            <!-- Sleek Left Sidebar Toggle -->
+            <button onclick="toggleSidebar('left')" class="w-10 h-10 flex items-center justify-center bg-white border border-slate-200/70 rounded-xl shadow-[0_2px_8px_rgba(0,0,0,0.04)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.08)] hover:-translate-y-0.5 text-slate-500 hover:text-blue-600 transition-all duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-blue-500/20" title="Toggle Components Menu">
+                <i class="fas fa-align-left text-[1.1rem]"></i>
+            </button>
+            <div class="flex items-center justify-center relative">
+                <div class="absolute inset-0 bg-blue-500 blur-md opacity-40" style="border-radius: 20px;"></div>
+                <img src="logo.png" alt="Airake Logo" class="w-10 h-10 object-contain shadow-lg relative z-10 bg-white p-1" style="border-radius: 20px;">
+            </div>
+            <div>
+                <h1 class="text-xl font-black text-slate-900 tracking-tight leading-tight">Airake</h1>
+                <p class="text-[10px] text-slate-500 font-bold uppercase tracking-widest text-blue-600">Built by Srijit Pattanayak</p>
+            </div>
+        </div>
+        
+        <!-- Multi-Page & History Controls -->
+        <div class="flex items-center space-x-2 bg-slate-50 p-1 rounded-lg border border-slate-200">
+            <select id="page-selector" onchange="switchPage(this.value)" class="bg-white border border-slate-300 text-sm rounded-md px-3 py-1.5 focus:outline-none focus:border-blue-500 font-bold text-slate-700 min-w-[120px]">
+                <option value="home">/home</option>
+            </select>
+            <button onclick="createNewPage()" class="p-1.5 text-slate-400 hover:text-blue-600 transition rounded" title="Add New Page"><i class="fas fa-plus"></i></button>
+            <div class="w-px h-5 bg-slate-300 mx-1"></div>
+            <button onclick="undo()" class="p-1.5 text-slate-400 hover:text-slate-800 transition rounded" title="Undo (Ctrl+Z)"><i class="fas fa-undo"></i></button>
+            <button onclick="redo()" class="p-1.5 text-slate-400 hover:text-slate-800 transition rounded" title="Redo (Ctrl+Y)"><i class="fas fa-redo"></i></button>
+            <div class="w-px h-5 bg-slate-300 mx-1"></div>
+            <button id="snap-toggle" onclick="toggleSnap()" class="p-1.5 text-slate-400 hover:text-blue-600 transition rounded" title="Toggle Snap to Grid"><i class="fas fa-magnet"></i></button>
+        </div>
+
+        <div class="flex space-x-3 items-center">
+            <button id="preview-btn" onclick="togglePreviewMode()" class="px-5 py-2 rounded-xl bg-slate-50 text-slate-600 hover:bg-white transition text-sm font-bold shadow-[0_2px_8px_rgba(0,0,0,0.04)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.08)] hover:-translate-y-0.5 border border-slate-200/70 flex items-center mr-2">
+                <i class="fas fa-eye mr-2 text-slate-400"></i><span id="preview-text">Live Preview</span>
+            </button>
+            <!-- Sleek Right Sidebar Toggle -->
+            <button onclick="toggleSidebar('right')" class="w-10 h-10 flex items-center justify-center bg-white border border-slate-200/70 rounded-xl shadow-[0_2px_8px_rgba(0,0,0,0.04)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.08)] hover:-translate-y-0.5 text-slate-500 hover:text-blue-600 transition-all duration-200 ease-in-out mr-2 focus:outline-none focus:ring-2 focus:ring-blue-500/20" title="Toggle Properties Menu">
+                <i class="fas fa-sliders-h text-[1.1rem]"></i>
+            </button>
+            <div class="w-px h-8 bg-slate-200 mx-2"></div>
+            <button onclick="clearCanvas()" class="px-4 py-2 rounded-xl bg-white text-slate-600 hover:bg-red-50 hover:text-red-600 border border-slate-200/70 transition text-sm font-semibold shadow-[0_2px_8px_rgba(0,0,0,0.04)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.08)] hover:-translate-y-0.5 flex items-center">
+                <i class="fas fa-trash-alt mr-2 text-xs"></i>Clear
+            </button>
+            <button id="publish-btn" onclick="openExportModal()" class="px-6 py-2 rounded-xl bg-blue-600 text-white hover:bg-blue-700 transition text-sm font-bold shadow-[0_4px_14px_rgba(37,99,235,0.3)] hover:shadow-[0_6px_20px_rgba(37,99,235,0.4)] hover:-translate-y-0.5 transform active:scale-95 flex items-center border border-blue-600">
+                <i class="fas fa-code mr-2"></i>Download Code
+            </button>
+        </div>
+    </header>
+
+    <!-- Main Workspace -->
+    <main class="flex-1 flex overflow-hidden">
+        
+        <!-- Left Sidebar: Components (Thinned down to w-60) -->
+        <aside id="left-sidebar" class="sidebar-transition w-60 bg-white border-r border-slate-200 flex flex-col z-20 flex-shrink-0 shadow-[4px_0_24px_rgba(0,0,0,0.02)] relative">
+            <div class="p-5 border-b border-slate-100 bg-slate-50">
+                <h2 class="text-xs font-black text-slate-800 uppercase tracking-widest mb-3">Add Elements</h2>
+                <div class="relative">
+                    <i class="fas fa-search absolute left-3 top-3 text-slate-400 text-sm"></i>
+                    <input type="text" id="component-search" placeholder="Search library..." class="w-full bg-white border border-slate-200 rounded-md text-sm py-2.5 pl-9 pr-3 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition shadow-sm font-medium text-slate-700" onkeyup="filterComponents()">
+                </div>
+            </div>
+            
+            <div class="flex-1 overflow-y-auto custom-scrollbar" id="component-list">
+                <!-- Components injected here by JS -->
+            </div>
+        </aside>
+
+        <!-- Center: Canvas Area -->
+        <section id="canvas-wrapper" class="flex-1 relative">
+            
+            <div id="helper-toast" class="absolute top-4 left-1/2 -translate-x-1/2 z-20 bg-slate-900/90 text-white backdrop-blur-sm shadow-xl rounded-full px-6 py-2.5 text-xs font-semibold flex items-center space-x-3 transition-opacity duration-500 pointer-events-none">
+                <i class="fas fa-mouse-pointer text-blue-400"></i>
+                <span>Drag freely. Shift+Click to multi-select. Right-Click for Context Menu.</span>
+            </div>
+            
+            <!-- The Visual Scaler Container -->
+            <div id="canvas-scaler">
+                <div id="canvas-label">Desktop View (1440px)</div>
+                <!-- The Absolute Free-Form Canvas -->
+                <div id="canvas" ondrop="handleDropFromSidebar(event)" ondragover="allowDrop(event)">
+                    <!-- Smart Guide Lines -->
+                    <div id="guide-v" class="smart-guide"></div>
+                    <div id="guide-h" class="smart-guide"></div>
+                    <!-- Elements placed absolutely here -->
+                </div>
+            </div>
+        </section>
+
+        <!-- Right Sidebar: Customization Properties & Page Settings (Thinned down to w-64) -->
+        <aside id="properties-panel" class="sidebar-transition w-64 bg-white border-l border-slate-200 flex flex-col flex-shrink-0 z-20 shadow-[-4px_0_24px_rgba(0,0,0,0.02)]">
+            
+            <!-- When NO element is selected, show Page Settings -->
+            <div id="no-selection-msg" class="flex-1 flex flex-col" style="display: flex;">
+                <div class="p-8 text-center text-slate-400 text-sm mt-4 flex flex-col items-center">
+                    <div class="w-20 h-20 bg-slate-50 rounded-full flex items-center justify-center mb-4 border border-slate-100 shadow-inner">
+                        <i class="fas fa-object-group text-3xl text-slate-300"></i>
+                    </div>
+                    <p class="font-medium">Select any element on the canvas to edit its layout, content, and design.</p>
+                </div>
+                
+                <div class="p-5 border-t border-slate-100 bg-slate-50 flex-1">
+                    <h3 class="text-xs font-bold text-slate-800 uppercase mb-4 flex items-center"><i class="fas fa-route text-blue-500 mr-2 text-sm"></i> Current Page Settings</h3>
+                    
+                    <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+                        <label class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2">Page Path (URL Target)</label>
+                        <input type="text" id="page-path-input" class="w-full bg-slate-50 border border-slate-200 rounded-lg text-sm py-2 px-3 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition font-mono text-slate-700" placeholder="/about" onchange="updatePagePath(this.value)">
+                        <p class="text-[10px] text-slate-400 mt-2 leading-tight">Use this exact path in the <strong>Link Destination</strong> field of buttons or nav items to route users to this page.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- When an element IS selected, show Properties -->
+            <div id="properties-content" class="flex-1 flex flex-col overflow-hidden" style="display: none;">
+                <div class="p-5 border-b border-slate-100 bg-blue-50/50 shrink-0">
+                    <h2 class="text-xs font-black text-slate-500 uppercase tracking-widest mb-2">Currently Editing</h2>
+                    <div class="flex items-center">
+                        <span id="selected-type" class="bg-blue-600 text-white text-xs font-bold px-3 py-1.5 rounded-md shadow-sm w-full text-center flex items-center justify-center">
+                            <i class="fas fa-mouse-pointer mr-2 opacity-70"></i> No Selection
+                        </span>
+                    </div>
+                </div>
+
+                <!-- Tabs -->
+                <div class="flex border-b border-slate-200 text-xs font-bold bg-white px-2 pt-2 gap-1 shrink-0">
+                    <button class="flex-1 py-3 text-blue-600 border-b-2 border-blue-600 tab-btn hover:bg-slate-50 transition" onclick="switchTab('design')">
+                        <i class="fas fa-paint-brush mr-1.5"></i>Design
+                    </button>
+                    <button class="flex-1 py-3 text-slate-500 hover:text-slate-800 tab-btn hover:bg-slate-50 border-b-2 border-transparent transition" onclick="switchTab('settings')">
+                        <i class="fas fa-cog mr-1.5"></i>Settings
+                    </button>
+                </div>
+
+                <!-- Tab Contents -->
+                <div class="flex-1 overflow-y-auto p-5 custom-scrollbar bg-white">
+                    
+                    <!-- Design Tab -->
+                    <div id="tab-design" class="space-y-6 tab-pane" style="display: block;">
+                        
+                        <!-- Element Identification -->
+                        <div class="bg-slate-50 p-4 rounded-xl border border-slate-100 shadow-sm">
+                            <h3 class="text-xs font-bold text-slate-800 uppercase mb-3 flex items-center"><i class="fas fa-tag text-blue-500 mr-2 text-sm"></i> Layer Name</h3>
+                            <input type="text" id="prop-el-name" class="prop-input font-bold" placeholder="e.g. Hero Container" onchange="updateElementName(this.value)">
+                        </div>
+
+                        <!-- Core Dimensions -->
+                        <div class="bg-slate-50 p-4 rounded-xl border border-slate-100 shadow-sm">
+                            <h3 class="text-xs font-bold text-slate-800 uppercase mb-4 flex items-center"><i class="fas fa-ruler-combined text-blue-500 mr-2 text-sm"></i> Box Dimensions</h3>
+                            <div class="grid grid-cols-2 gap-4">
+                                <div class="input-group mb-0">
+                                    <label class="prop-label">Width</label>
+                                    <input type="text" id="prop-width" class="prop-input font-mono" placeholder="100%, 300px" onchange="updateStyle('width', this.value)">
+                                </div>
+                                <div class="input-group mb-0">
+                                    <label class="prop-label">Height</label>
+                                    <input type="text" id="prop-height" class="prop-input font-mono" placeholder="auto, 200px" onchange="updateStyle('height', this.value)">
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Layering / Z-Index -->
+                        <div class="bg-slate-50 p-4 rounded-xl border border-slate-100 shadow-sm">
+                            <h3 class="text-xs font-bold text-slate-800 uppercase mb-4 flex items-center"><i class="fas fa-layer-group text-blue-500 mr-2 text-sm"></i> Layer Order</h3>
+                            <p class="text-[10px] text-slate-500 mb-3 leading-tight">Move overlapping elements up or down.</p>
+                            <div class="grid grid-cols-2 gap-2">
+                                <button onclick="adjustZIndex(1)" class="bg-white hover:bg-slate-50 text-slate-700 py-2 rounded-lg text-xs font-bold transition border border-slate-200 shadow-sm flex items-center justify-center">
+                                    <i class="fas fa-angle-up mr-1.5 text-blue-500"></i> Forward
+                                </button>
+                                <button onclick="adjustZIndex(-1)" class="bg-white hover:bg-slate-50 text-slate-700 py-2 rounded-lg text-xs font-bold transition border border-slate-200 shadow-sm flex items-center justify-center">
+                                    <i class="fas fa-angle-down mr-1.5 text-slate-500"></i> Backward
+                                </button>
+                                <button onclick="adjustZIndex('front')" class="bg-white hover:bg-slate-50 text-slate-700 py-2 rounded-lg text-xs font-bold transition border border-slate-200 shadow-sm flex items-center justify-center">
+                                    <i class="fas fa-angle-double-up mr-1.5 text-blue-500"></i> To Front
+                                </button>
+                                <button onclick="adjustZIndex('back')" class="bg-white hover:bg-slate-50 text-slate-700 py-2 rounded-lg text-xs font-bold transition border border-slate-200 shadow-sm flex items-center justify-center">
+                                    <i class="fas fa-angle-double-down mr-1.5 text-slate-500"></i> To Back
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Typography -->
+                        <div class="bg-slate-50 p-4 rounded-xl border border-slate-100 shadow-sm" id="typography-panel">
+                            <h3 class="text-xs font-bold text-slate-800 uppercase mb-4 flex items-center"><i class="fas fa-font text-blue-500 mr-2 text-sm"></i> Text Styling</h3>
+                            
+                            <div class="input-group">
+                                <label class="prop-label">Font Family</label>
+                                <select id="prop-fontfamily" class="prop-input font-medium" onchange="updateStyle('fontFamily', this.value)">
+                                    <option value="">Inherit Parent Font</option>
+                                    <option value="'Inter', sans-serif">Inter (Modern Clean)</option>
+                                    <option value="'Roboto', sans-serif">Roboto (Tech)</option>
+                                    <option value="'Playfair Display', serif">Playfair (Elegant)</option>
+                                    <option value="'Space Mono', monospace">Space Mono (Code)</option>
+                                    <option value="Arial, sans-serif">Arial (Basic)</option>
+                                </select>
+                            </div>
+
+                            <div class="grid grid-cols-2 gap-4">
+                                <div class="input-group">
+                                    <label class="prop-label">Font Size</label>
+                                    <input type="text" id="prop-fontsize" class="prop-input font-mono" placeholder="16px, 2rem" onchange="updateStyle('fontSize', this.value)">
+                                </div>
+                                <div class="input-group">
+                                    <label class="prop-label">Font Weight</label>
+                                    <select id="prop-fontweight" class="prop-input font-medium" onchange="updateStyle('fontWeight', this.value)">
+                                        <option value="">Inherit</option>
+                                        <option value="300">Light</option>
+                                        <option value="400">Regular</option>
+                                        <option value="500">Medium</option>
+                                        <option value="600">Semi-Bold</option>
+                                        <option value="700">Bold</option>
+                                        <option value="900">Black</option>
+                                    </select>
+                                </div>
+                            </div>
+                            
+                            <div class="input-group">
+                                <label class="prop-label">Alignment</label>
+                                <div class="flex border border-slate-200 rounded-md overflow-hidden bg-white shadow-sm">
+                                    <button class="flex-1 py-2 text-slate-500 hover:bg-slate-50 hover:text-blue-600 transition text-sm border-r border-slate-200" onclick="updateStyle('textAlign', 'left')"><i class="fas fa-align-left"></i></button>
+                                    <button class="flex-1 py-2 text-slate-500 hover:bg-slate-50 hover:text-blue-600 transition text-sm border-r border-slate-200" onclick="updateStyle('textAlign', 'center')"><i class="fas fa-align-center"></i></button>
+                                    <button class="flex-1 py-2 text-slate-500 hover:bg-slate-50 hover:text-blue-600 transition text-sm border-r border-slate-200" onclick="updateStyle('textAlign', 'right')"><i class="fas fa-align-right"></i></button>
+                                    <button class="flex-1 py-2 text-slate-500 hover:bg-slate-50 hover:text-blue-600 transition text-sm" onclick="updateStyle('textAlign', 'justify')"><i class="fas fa-align-justify"></i></button>
+                                </div>
+                            </div>
+
+                            <div class="input-group mb-0">
+                                <label class="prop-label">Text Color</label>
+                                <div class="flex items-center space-x-2 bg-white border border-slate-200 rounded-md p-1 shadow-sm">
+                                    <input type="color" id="prop-color" class="h-8 w-10 rounded cursor-pointer border-0 bg-transparent p-0" oninput="updateStyle('color', this.value)">
+                                    <input type="text" id="prop-color-text" class="w-full bg-transparent border-0 text-sm font-mono uppercase focus:outline-none px-2" placeholder="#000000" onchange="updateStyle('color', this.value); document.getElementById('prop-color').value = this.value;">
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Spacing (Margin & Padding) -->
+                        <div class="bg-slate-50 p-4 rounded-xl border border-slate-100 shadow-sm">
+                            <h3 class="text-xs font-bold text-slate-800 uppercase mb-4 flex items-center"><i class="fas fa-border-style text-blue-500 mr-2 text-sm"></i> Layout Spacing</h3>
+                            
+                            <label class="prop-label mb-2 text-[10px] text-slate-400">Padding (Inner Space)</label>
+                            <div class="grid grid-cols-4 gap-2 mb-4">
+                                <input type="text" id="prop-pt" class="prop-input text-center px-1 font-mono text-xs" placeholder="Top" onchange="updateStyle('paddingTop', this.value)">
+                                <input type="text" id="prop-pr" class="prop-input text-center px-1 font-mono text-xs" placeholder="Right" onchange="updateStyle('paddingRight', this.value)">
+                                <input type="text" id="prop-pb" class="prop-input text-center px-1 font-mono text-xs" placeholder="Bottom" onchange="updateStyle('paddingBottom', this.value)">
+                                <input type="text" id="prop-pl" class="prop-input text-center px-1 font-mono text-xs" placeholder="Left" onchange="updateStyle('paddingLeft', this.value)">
+                            </div>
+
+                            <label class="prop-label mb-2 text-[10px] text-slate-400">Margin (Outer Space)</label>
+                            <div class="grid grid-cols-4 gap-2">
+                                <input type="text" id="prop-mt" class="prop-input text-center px-1 font-mono text-xs" placeholder="Top" onchange="updateStyle('marginTop', this.value)">
+                                <input type="text" id="prop-mr" class="prop-input text-center px-1 font-mono text-xs" placeholder="Right" onchange="updateStyle('marginRight', this.value)">
+                                <input type="text" id="prop-mb" class="prop-input text-center px-1 font-mono text-xs" placeholder="Bottom" onchange="updateStyle('marginBottom', this.value)">
+                                <input type="text" id="prop-ml" class="prop-input text-center px-1 font-mono text-xs" placeholder="Left" onchange="updateStyle('marginLeft', this.value)">
+                            </div>
+                        </div>
+
+                        <!-- Appearance -->
+                        <div class="bg-slate-50 p-4 rounded-xl border border-slate-100 shadow-sm">
+                            <h3 class="text-xs font-bold text-slate-800 uppercase mb-4 flex items-center"><i class="fas fa-palette text-blue-500 mr-2 text-sm"></i> Appearance</h3>
+                            
+                            <div class="input-group">
+                                <label class="prop-label">Background Color</label>
+                                <div class="flex items-center space-x-2 bg-white border border-slate-200 rounded-md p-1 shadow-sm">
+                                    <input type="color" id="prop-bgcolor" class="h-8 w-10 rounded cursor-pointer border-0 bg-transparent p-0" oninput="updateStyle('backgroundColor', this.value)">
+                                    <input type="text" id="prop-bgcolor-text" class="w-full bg-transparent border-0 text-sm font-mono uppercase focus:outline-none px-2" placeholder="transparent" onchange="updateStyle('backgroundColor', this.value); document.getElementById('prop-bgcolor').value = this.value;">
+                                </div>
+                            </div>
+
+                            <div class="grid grid-cols-2 gap-4">
+                                <div class="input-group mb-0">
+                                    <label class="prop-label">Corner Radius</label>
+                                    <input type="text" id="prop-radius" class="prop-input font-mono" placeholder="8px, 50%" onchange="updateStyle('borderRadius', this.value)">
+                                </div>
+                                <div class="input-group mb-0">
+                                    <label class="prop-label">Border</label>
+                                    <input type="text" id="prop-border" class="prop-input font-mono" placeholder="2px solid #000" onchange="updateStyle('border', this.value)">
+                                </div>
+                            </div>
+                        </div>
+
+                    </div>
+
+                    <!-- Settings Tab (Content) -->
+                    <div id="tab-settings" class="space-y-6 tab-pane" style="display: none;">
+                        
+                        <!-- Element Details Always Visible to ensure tab is never completely blank -->
+                        <div class="bg-slate-50 p-4 rounded-xl border border-slate-100 shadow-sm">
+                            <h3 class="text-xs font-bold text-slate-800 uppercase mb-2 flex items-center"><i class="fas fa-info-circle text-blue-500 mr-2 text-sm"></i> Element Type</h3>
+                            <input type="text" id="prop-node-tag" class="prop-input font-mono text-slate-400 bg-slate-100 cursor-not-allowed border-slate-200" readonly>
+                        </div>
+                        
+                        <!-- Media Source -->
+                        <div id="content-src-group" class="bg-slate-50 p-4 rounded-xl border border-slate-100 shadow-sm" style="display: none;">
+                            <h3 class="text-xs font-bold text-slate-800 uppercase mb-4 flex items-center"><i class="fas fa-image text-blue-500 mr-2 text-sm"></i> Media Source</h3>
+                            
+                            <!-- Local Upload Option -->
+                            <div class="mb-4">
+                                <label class="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2 block">Upload Local Image</label>
+                                <div class="relative w-full border-2 border-dashed border-slate-300 rounded-lg p-4 hover:bg-white hover:border-blue-400 transition cursor-pointer text-center group">
+                                    <input type="file" id="prop-image-upload" accept="image/*" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer" onchange="handleImageUpload(event)">
+                                    <i class="fas fa-cloud-upload-alt text-2xl text-slate-400 group-hover:text-blue-500 mb-2 transition"></i>
+                                    <p class="text-xs font-semibold text-slate-600">Click or Drop Image</p>
+                                </div>
+                            </div>
+
+                            <div class="flex items-center text-[10px] text-slate-400 font-bold uppercase my-3"><hr class="flex-1 border-slate-200"><span class="mx-2">OR</span><hr class="flex-1 border-slate-200"></div>
+
+                            <label class="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2 block">Paste URL (Image/Video)</label>
+                            <input type="text" id="prop-src" class="prop-input font-mono text-xs" placeholder="https://..." onchange="updateContent('src', this.value)">
+                            <img id="preview-image" src="" class="mt-4 w-full h-32 object-contain rounded-lg border border-slate-200 hidden shadow-sm bg-white p-1" alt="Preview">
+                        </div>
+
+                        <!-- Link Href -->
+                        <div id="content-href-group" class="bg-slate-50 p-4 rounded-xl border border-slate-100 shadow-sm" style="display: none;">
+                            <h3 class="text-xs font-bold text-slate-800 uppercase mb-2 flex items-center"><i class="fas fa-link text-blue-500 mr-2 text-sm"></i> Link Destination</h3>
+                            <p class="text-[10px] text-slate-500 mb-3 leading-tight">Link to other pages (e.g., <strong>/about</strong>, <strong>/contact</strong>) or external sites (https://...)</p>
+                            <div class="relative">
+                                <i class="fas fa-globe absolute left-3 top-2.5 text-slate-400 text-sm"></i>
+                                <input type="text" id="prop-href" class="prop-input pl-9" placeholder="/about or https://..." onchange="updateContent('href', this.value)">
+                            </div>
+                        </div>
+
+                        <!-- Form Input placeholders -->
+                        <div id="content-input-group" class="bg-slate-50 p-4 rounded-xl border border-slate-100 shadow-sm" style="display: none;">
+                            <h3 class="text-xs font-bold text-slate-800 uppercase mb-3 flex items-center"><i class="fas fa-keyboard text-blue-500 mr-2 text-sm"></i> Input Field Data</h3>
+                            <label class="prop-label">Placeholder Text</label>
+                            <input type="text" id="prop-placeholder" class="prop-input mb-3" placeholder="Enter placeholder..." onchange="updateContent('placeholder', this.value)">
+                            <label class="prop-label">Default Value</label>
+                            <input type="text" id="prop-value" class="prop-input" placeholder="Enter default value..." onchange="updateContent('value', this.value)">
+                        </div>
+
+                        <!-- Text Editor -->
+                        <div id="content-quick-text-group" class="bg-slate-50 p-4 rounded-xl border border-slate-100 shadow-sm" style="display: none;">
+                            <h3 class="text-xs font-bold text-slate-800 uppercase mb-3 flex items-center"><i class="fas fa-pen-nib text-blue-500 mr-2 text-sm"></i> Edit Text & HTML</h3>
+                            <div class="bg-blue-100 border border-blue-200 p-2 rounded mb-3 flex items-start">
+                                <i class="fas fa-info-circle text-blue-500 mt-0.5 mr-2 text-xs"></i>
+                                <p class="text-[10px] text-blue-800 leading-tight">You are editing the raw HTML of the selected node. You can safely change text, or inject tags like <code>&lt;br&gt;</code>.</p>
+                            </div>
+                            <textarea id="prop-quicktext" rows="8" class="prop-input resize-y text-sm font-mono leading-relaxed" oninput="updateContent('innerHTML', this.value)" placeholder="Enter text here..."></textarea>
+                        </div>
+                    </div>
+
+                </div>
+
+                <!-- Actions Footer -->
+                <div class="p-4 border-t border-slate-200 bg-white grid grid-cols-2 gap-3 shrink-0">
+                    <button onclick="duplicateElement()" class="col-span-1 bg-white hover:bg-slate-50 text-slate-700 py-2.5 rounded-lg text-sm transition border border-slate-200 shadow-sm font-bold flex items-center justify-center">
+                        <i class="far fa-copy mr-2"></i> Duplicate
+                    </button>
+                    <button onclick="deleteElementWrapper()" class="col-span-1 bg-red-50 hover:bg-red-100 text-red-600 py-2.5 rounded-lg text-sm transition border border-red-200 shadow-sm font-bold flex items-center justify-center">
+                        <i class="far fa-trash-alt mr-2"></i> Delete
+                    </button>
+                </div>
+            </div>
+        </aside>
+
+    </main>
+
+    <!-- Export Modal -->
+    <div id="export-modal" class="fixed inset-0 bg-slate-900/80 hidden z-[100] flex flex-col items-center justify-center backdrop-blur-sm p-6 opacity-0 transition-opacity duration-300">
+        <div class="bg-white border border-slate-200 rounded-2xl shadow-2xl w-full max-w-5xl h-[85vh] flex flex-col overflow-hidden transform scale-95 transition-transform duration-300" id="export-modal-content">
+            <div class="flex justify-between items-center p-6 border-b border-slate-100 bg-slate-50">
+                <h3 class="text-xl font-black text-slate-800 flex items-center"><i class="fas fa-laptop-code text-blue-600 mr-3 text-2xl"></i> Your Compiled Website Code</h3>
+                <button onclick="closeExportModal()" class="text-slate-400 hover:text-slate-700 hover:bg-slate-200 w-8 h-8 rounded-full transition flex items-center justify-center"><i class="fas fa-times text-lg"></i></button>
+            </div>
+            <div class="p-6 flex-1 overflow-hidden flex flex-col bg-slate-50">
+                <div class="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-4 flex items-start">
+                    <i class="fas fa-check-circle text-blue-500 text-xl mr-3 mt-0.5"></i>
+                    <div>
+                        <h4 class="font-bold text-blue-800 text-sm">Successfully Compiled!</h4>
+                        <p class="text-sm text-blue-600 mt-1">Multi-page routing and links have been successfully generated. You can force download or copy the code manually below.</p>
+                    </div>
+                </div>
+                <textarea id="export-code-area" class="w-full flex-1 bg-[#0f172a] text-[#e2e8f0] font-mono text-sm p-4 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-inner resize-none" spellcheck="false" readonly></textarea>
+            </div>
+            <div class="p-6 border-t border-slate-100 bg-white flex justify-between items-center gap-4">
+                <span class="text-xs text-slate-400 font-bold uppercase tracking-wider">Production Ready HTML</span>
+                <div class="flex space-x-3">
+                    <button onclick="copyExportedCode()" class="bg-white text-slate-700 border border-slate-300 px-6 py-3 rounded-xl hover:bg-slate-50 hover:text-blue-600 transition font-bold shadow-sm flex items-center">
+                        <i class="far fa-copy mr-2"></i>Copy Code
+                    </button>
+                    <button onclick="triggerFileDownload()" class="bg-blue-600 text-white px-8 py-3 rounded-xl shadow-lg hover:bg-blue-700 hover:shadow-xl transform active:scale-95 transition-all font-bold flex items-center">
+                        <i class="fas fa-download mr-2"></i>Download .html File
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- New Page Modal -->
+    <div id="new-page-modal" class="fixed inset-0 bg-slate-900/80 hidden z-[100] flex flex-col items-center justify-center backdrop-blur-sm p-6 opacity-0 transition-opacity duration-300">
+        <div class="bg-white border border-slate-200 rounded-2xl shadow-2xl w-full max-w-sm flex flex-col overflow-hidden transform scale-95 transition-transform duration-300" id="new-page-modal-content">
+            <div class="flex justify-between items-center p-5 border-b border-slate-100 bg-slate-50">
+                <h3 class="text-lg font-black text-slate-800 flex items-center"><i class="fas fa-file-alt text-blue-600 mr-3"></i> Create New Page</h3>
+                <button onclick="closeNewPageModal()" class="text-slate-400 hover:text-slate-700 hover:bg-slate-200 w-8 h-8 rounded-full transition flex items-center justify-center"><i class="fas fa-times text-lg"></i></button>
+            </div>
+            <div class="p-6 bg-white">
+                <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Page Path</label>
+                <input type="text" id="new-page-input" class="w-full bg-slate-50 border border-slate-200 rounded-lg text-sm py-3 px-4 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition font-mono text-slate-700" placeholder="e.g. /about, /portfolio" onkeydown="if(event.key === 'Enter') confirmNewPage()">
+                <p class="text-[10px] text-slate-400 mt-2">This will be the URL route for your new page.</p>
+            </div>
+            <div class="p-5 border-t border-slate-100 bg-slate-50 flex justify-end space-x-3">
+                <button onclick="closeNewPageModal()" class="bg-white text-slate-600 border border-slate-300 px-5 py-2 rounded-xl hover:bg-slate-50 transition font-bold text-sm shadow-sm">Cancel</button>
+                <button onclick="confirmNewPage()" class="bg-blue-600 text-white px-6 py-2 rounded-xl shadow-lg hover:bg-blue-700 hover:shadow-xl transform active:scale-95 transition-all font-bold text-sm">Create Page</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Right-Click Context Menu -->
+    <div id="context-menu" class="hidden absolute bg-white shadow-2xl border border-slate-200 rounded-lg py-1 z-[1000] text-sm min-w-[160px] font-medium text-slate-700">
+        <div class="px-4 py-2 hover:bg-blue-50 hover:text-blue-600 cursor-pointer transition flex items-center" onclick="ctxDuplicate()"><i class="far fa-copy w-5"></i> Duplicate</div>
+        <div class="border-t border-slate-100 my-1"></div>
+        <div class="px-4 py-2 hover:bg-blue-50 hover:text-blue-600 cursor-pointer transition flex items-center" onclick="ctxBringFront()"><i class="fas fa-angle-double-up w-5"></i> Bring to Front</div>
+        <div class="px-4 py-2 hover:bg-blue-50 hover:text-blue-600 cursor-pointer transition flex items-center" onclick="ctxSendBack()"><i class="fas fa-angle-double-down w-5"></i> Send to Back</div>
+        <div class="border-t border-slate-100 my-1"></div>
+        <div class="px-4 py-2 hover:bg-red-50 hover:text-red-600 cursor-pointer transition flex items-center text-red-500" onclick="ctxDelete()"><i class="far fa-trash-alt w-5"></i> Delete</div>
+    </div>
+
+    <!-- Scripts -->
+    <script>
+        const fallbackLogo = 'https://upload.wikimedia.org/wikipedia/commons/thumb/1/1b/Apple_logo_grey.svg/1024px-Apple_logo_grey.svg.png';
+
+        // --- Massive Component Library Expansion ---
+        const components = [
+            // Responsive Tailwind Upgraded Structural Sections
+            { type: 'floating-nav', category: 'Headers & Footers', icon: 'fa-window-maximize', name: 'Floating Navbar', html: `<nav class="bg-white/80 backdrop-blur-md shadow-2xl border border-white/50 px-6 md:px-10 py-4 flex flex-col md:flex-row justify-between items-center rounded-2xl md:rounded-full w-[90%] md:w-[800px] z-[100] gap-4 md:gap-0"><div class="flex items-center space-x-4"><img src="\${fallbackLogo}" alt="Logo" class="h-8 w-auto rounded-xl object-cover"><h1 class="text-2xl font-black text-slate-900 tracking-tight">Airake</h1></div><ul class="flex flex-wrap justify-center space-x-4 md:space-x-10 text-sm font-bold text-slate-600"><li class="hover:text-blue-600 transition cursor-pointer" data-href="/home">Home</li><li class="hover:text-blue-600 transition cursor-pointer" data-href="/about">About</li><li class="hover:text-blue-600 transition cursor-pointer" data-href="/contact">Contact</li></ul><button class="bg-blue-600 text-white px-8 py-3 rounded-full text-sm font-bold shadow-lg hover:bg-blue-700 transition w-full md:w-auto" data-href="/pricing">Get Started</button></nav>` },
+            { type: 'navbar', category: 'Headers & Footers', icon: 'fa-bars', name: 'Standard Navbar', html: `<nav class="bg-white shadow-md w-full"><div class="max-w-[1440px] mx-auto px-6 md:px-10 py-5 flex flex-col md:flex-row justify-between items-center gap-4 md:gap-0"><div class="flex items-center space-x-4"><img src="\${fallbackLogo}" alt="Logo" class="h-9 w-auto rounded-lg object-cover"><h1 class="text-3xl font-black text-slate-900 tracking-tight">Airake</h1></div><ul class="flex flex-wrap justify-center space-x-4 md:space-x-10 text-sm md:text-base font-semibold text-slate-600"><li class="hover:text-blue-600 transition cursor-pointer" data-href="/home">Home</li><li class="hover:text-blue-600 transition cursor-pointer" data-href="/services">Services</li><li class="hover:text-blue-600 transition cursor-pointer" data-href="/portfolio">Portfolio</li><li class="hover:text-blue-600 transition cursor-pointer" data-href="/contact">Contact</li></ul><button class="bg-blue-600 text-white px-8 py-2.5 rounded-full text-sm font-bold shadow-lg hover:bg-blue-700 transition w-full md:w-auto" data-href="/get-started">Get Started</button></div></nav>` },
+            { type: 'footer', category: 'Headers & Footers', icon: 'fa-shoe-prints', name: 'Dark Footer', html: '<footer class="bg-slate-900 text-slate-300 py-12 md:py-20 w-full"><div class="max-w-[1440px] mx-auto px-6 md:px-16 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-12"><div><h2 class="text-white text-3xl font-black mb-6">Airake.</h2><p class="text-sm leading-relaxed text-slate-400">Building the future of web design, one block at a time. Create stunning portfolios effortlessly.</p></div><div><h3 class="text-white font-bold mb-6 uppercase tracking-wider text-sm">Resources</h3><ul class="space-y-3 text-sm text-slate-400"><li class="hover:text-white cursor-pointer" data-href="/docs">Documentation</li><li class="hover:text-white cursor-pointer" data-href="/tutorials">Tutorials</li><li class="hover:text-white cursor-pointer" data-href="/blog">Blog</li></ul></div><div><h3 class="text-white font-bold mb-6 uppercase tracking-wider text-sm">Company</h3><ul class="space-y-3 text-sm text-slate-400"><li class="hover:text-white cursor-pointer" data-href="/about">About Us</li><li class="hover:text-white cursor-pointer" data-href="/careers">Careers</li><li class="hover:text-white cursor-pointer" data-href="/contact">Contact</li></ul></div><div><h3 class="text-white font-bold mb-6 uppercase tracking-wider text-sm">Subscribe</h3><p class="text-sm text-slate-400 mb-4">Get the latest news.</p><div class="flex"><input type="email" placeholder="Email address" class="px-4 py-3 text-sm rounded-l bg-slate-800 border border-slate-700 text-white w-full focus:outline-none focus:border-blue-500"><button class="bg-blue-600 text-white px-6 py-3 rounded-r text-sm font-bold">Add</button></div></div></div></footer>' },
+            { type: 'hero-split', category: 'Headers & Footers', icon: 'fa-chalkboard', name: 'Split Hero Section', html: '<div class="bg-slate-50 py-16 md:py-24 w-full"><div class="max-w-[1440px] mx-auto px-6 md:px-16 flex flex-col md:flex-row items-center justify-between gap-10"><div class="w-full md:w-1/2 pr-0 md:pr-12"><h1 class="text-4xl md:text-6xl font-extrabold text-slate-900 leading-tight mb-6">Build your <span class="text-blue-600">dream site</span></h1><p class="text-lg md:text-xl text-slate-600 leading-relaxed mb-8">Design professional portfolios in minutes using our advanced visual studio. No coding required.</p><div class="flex flex-col sm:flex-row space-y-4 sm:space-y-0 sm:space-x-4"><button class="bg-blue-600 text-white px-8 py-4 rounded-xl font-bold shadow-xl hover:bg-blue-700 transition" data-href="/signup">Start Free Trial</button><button class="bg-white text-slate-700 border border-slate-300 px-8 py-4 rounded-xl font-bold shadow-sm hover:bg-slate-50 transition" data-href="/demo">View Demo</button></div></div><div class="w-full md:w-1/2"><img src="https://images.unsplash.com/photo-1498050108023-c5249f4df085?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80" class="rounded-3xl shadow-2xl object-cover w-full h-[300px] md:h-[450px]" alt="Hero Image"></div></div></div>' },
+            
+            // Containers
+            { type: 'section', category: 'Layout Blocks', icon: 'fa-vector-square', name: 'Full Width Blank', html: '<div class="bg-white border-b border-slate-200 w-full min-h-[400px]"><div class="max-w-[1440px] mx-auto px-6 p-12 h-full w-full"></div></div>' },
+            { type: 'card', category: 'Layout Blocks', icon: 'fa-id-card', name: 'Content Card', html: '<div class="bg-white p-10 rounded-3xl shadow-2xl border border-slate-100 flex flex-col items-start w-full max-w-[380px]"><div class="w-14 h-14 bg-blue-100 text-blue-600 rounded-xl flex items-center justify-center text-2xl mb-6"><i class="fas fa-rocket"></i></div><h3 class="text-2xl font-bold text-slate-900 mb-3">Fast Performance</h3><p class="text-slate-600 text-base leading-relaxed mb-8">Experience lightning fast load times optimized directly out of the box.</p><button class="text-blue-600 font-bold text-base hover:text-blue-800 transition" data-href="/features">Learn more &rarr;</button></div>' },
+            { type: 'box', category: 'Layout Blocks', icon: 'fa-box', name: 'Simple Div Box', html: '<div class="bg-slate-100 p-6 rounded-xl border border-slate-200 w-full max-w-[300px] min-h-[200px]"></div>' },
+
+            // Typography
+            { type: 'h1', category: 'Typography', icon: 'fa-heading', name: 'Large Title', html: '<h1 class="text-4xl md:text-6xl font-extrabold text-slate-900 tracking-tight w-full max-w-[800px]">Design beautiful pages with absolute freedom.</h1>' },
+            { type: 'h2', category: 'Typography', icon: 'fa-heading', name: 'Subtitle', html: '<h2 class="text-3xl md:text-4xl font-bold text-slate-800 w-full max-w-[600px]">Section Subtitle Here</h2>' },
+            { type: 'p', category: 'Typography', icon: 'fa-paragraph', name: 'Text Paragraph', html: '<p class="text-lg md:text-xl text-slate-600 leading-relaxed w-full max-w-[600px]">This is a highly customizable paragraph block. Click exactly on this text to change its font family, size, line height, color, and more from the right sidebar.</p>' },
+            { type: 'quote', category: 'Typography', icon: 'fa-quote-left', name: 'Blockquote', html: '<blockquote class="border-l-4 border-blue-500 pl-8 py-4 bg-blue-50/50 rounded-r-xl w-full max-w-[600px]"><p class="italic text-2xl text-slate-700 font-serif mb-3">"Simplicity is the ultimate sophistication."</p><span class="text-sm font-bold text-slate-500 uppercase tracking-widest">— Leonardo da Vinci</span></blockquote>' },
+            
+            // UI & Forms
+            { type: 'btn-primary', category: 'Buttons & Forms', icon: 'fa-mouse', name: 'Primary Button', html: '<button class="bg-blue-600 text-white font-bold px-10 py-4 rounded-xl shadow-lg hover:shadow-xl hover:-translate-y-1 transition-all text-lg w-full sm:w-[250px]">Click Me</button>' },
+            { type: 'btn-outline', category: 'Buttons & Forms', icon: 'fa-square', name: 'Outline Button', html: '<button class="border-2 border-slate-900 text-slate-900 font-bold px-10 py-4 rounded-xl hover:bg-slate-900 hover:text-white transition-all text-lg w-full sm:w-[250px]">Learn More</button>' },
+            { type: 'input', category: 'Buttons & Forms', icon: 'fa-keyboard', name: 'Text Input', html: '<input type="text" placeholder="Enter your email..." class="border border-slate-300 rounded-xl px-5 py-4 shadow-sm focus:ring-2 focus:ring-blue-500 outline-none text-slate-700 text-lg w-full max-w-[350px]">' },
+            { type: 'contact-form', category: 'Buttons & Forms', icon: 'fa-envelope-open-text', name: 'Advanced Form', html: '<form class="bg-white p-6 md:p-10 rounded-3xl shadow-2xl border border-slate-100 w-full max-w-[450px]"><h3 class="text-3xl font-black mb-8 text-slate-900">Send a Message</h3><label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Full Name</label><input type="text" placeholder="John Doe" class="w-full px-5 py-4 mb-5 border border-slate-200 rounded-xl bg-slate-50 focus:bg-white focus:ring-2 focus:ring-blue-500 transition outline-none text-base"><label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Email Address</label><input type="email" placeholder="john@example.com" class="w-full px-5 py-4 mb-5 border border-slate-200 rounded-xl bg-slate-50 focus:bg-white focus:ring-2 focus:ring-blue-500 transition outline-none text-base"><label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Your Message</label><textarea rows="4" placeholder="How can we help?" class="w-full px-5 py-4 mb-8 border border-slate-200 rounded-xl bg-slate-50 focus:bg-white focus:ring-2 focus:ring-blue-500 transition outline-none text-base resize-none"></textarea><button type="button" class="w-full bg-slate-900 text-white font-bold py-4 rounded-xl shadow-lg hover:bg-slate-800 transition text-lg">Submit Form</button></form>' },
+
+            // Advanced Media
+            { type: 'image', category: 'Media', icon: 'fa-image', name: 'Standard Image', html: '<img src="https://images.unsplash.com/photo-1551288049-bebda4e38f71?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80" alt="Workspace" class="rounded-3xl shadow-xl border-4 border-white w-full max-w-[500px] h-auto object-cover">' },
+            { type: 'youtube', category: 'Media', icon: 'fa-youtube', name: 'YouTube Embed', html: '<iframe src="https://www.youtube.com/embed/dQw4w9WgXcQ" frameborder="0" class="rounded-2xl shadow-2xl w-full max-w-[600px] h-[250px] md:h-[337px]"></iframe>' }
+        ];
+
+        // --- Core State Architecture ---
+        let builderState = {
+            pages: {
+                'home': { id: 'home', name: '/home', elements: [] }
+            },
+            currentPage: 'home'
+        };
+
+        let undoStack = [];
+        let redoStack = [];
+        let saveTimeout;
+
+        let snapEnabled = false;
+        const GRID_SIZE = 20;
+
+        const canvasWrapper = document.getElementById('canvas-wrapper');
+        const canvasScaler = document.getElementById('canvas-scaler');
+        const canvas = document.getElementById('canvas');
+        const guideV = document.getElementById('guide-v');
+        const guideH = document.getElementById('guide-h');
+        
+        let currentScale = 1;
+
+        // Deep Selection State
+        let selectedWrappers = []; // Multi-select support
+        let selectedNode = null;   // The EXACT element clicked
+        
+        // Free Dragging State
+        let isDraggingCanvasElement = false;
+        let startCursorX, startCursorY;
+        let dragInitialPositions = []; // Store initial positions for all selected elements
+
+        const generateId = () => 'el-' + Math.random().toString(36).substr(2, 9);
+
+        // Define handleGlobalKeydown BEFORE it's used in event listener
+        function handleGlobalKeydown(e) {
+            if (e.ctrlKey && e.key === 'z') { e.preventDefault(); undo(); return; }
+            if (e.ctrlKey && e.key === 'y') { e.preventDefault(); redo(); return; }
+            
+            const activeTag = document.activeElement ? document.activeElement.tagName : '';
+            if (['INPUT', 'TEXTAREA', 'SELECT'].includes(activeTag)) return;
+            if (e.key === 'Delete' || e.key === 'Backspace') {
+                e.preventDefault();
+                deleteElementWrapper();
+            }
+            if (e.key === 'Escape') deselectElement();
+        }
+
+        // --- Init App ---
+        function init() {
+            renderComponentList();
+            setupCanvasInteractions();
+            setupContextMenu();
+            
+            document.addEventListener('keydown', handleGlobalKeydown);
+            
+            // Generate initial canvas state (Floating Nav + Hero) into BuilderState
+            const navHtml = components.find(c=>c.type==='floating-nav').html;
+            const heroHtml = components.find(c=>c.type==='hero-split').html;
+            
+            addElementToState(navHtml, 320, 20, 'floating-nav', 'Navigation');
+            addElementToState(heroHtml, 0, 0, 'hero-split', 'Hero Section');
+
+            setTimeout(() => {
+                const toast = document.getElementById('helper-toast');
+                if(toast) { toast.style.opacity = '0'; setTimeout(()=>toast.remove(), 500); }
+            }, 8000);
+
+            updateCanvasScale();
+            window.addEventListener('resize', updateCanvasScale);
+        }
+
+        // --- State Management Engine ---
+        function saveHistory() {
+            const clonedElements = JSON.parse(JSON.stringify(builderState.pages[builderState.currentPage].elements));
+            undoStack.push(clonedElements);
+            if (undoStack.length > 50) undoStack.shift(); // Limit memory
+            redoStack = []; // Clear redo on new action
+        }
+
+        function debouncedSaveHistory() {
+            clearTimeout(saveTimeout);
+            saveTimeout = setTimeout(() => saveHistory(), 400);
+        }
+
+        function undo() {
+            if (undoStack.length > 1) { // Leave at least 1 state
+                redoStack.push(undoStack.pop());
+                const previousState = undoStack[undoStack.length - 1];
+                builderState.pages[builderState.currentPage].elements = JSON.parse(JSON.stringify(previousState));
+                renderCanvasFromState();
+            }
+        }
+
+        function redo() {
+            if (redoStack.length > 0) {
+                const nextState = redoStack.pop();
+                undoStack.push(nextState);
+                builderState.pages[builderState.currentPage].elements = JSON.parse(JSON.stringify(nextState));
+                renderCanvasFromState();
+            }
+        }
+
+        function addElementToState(htmlString, x, y, type, defaultName) {
+            const id = generateId();
+            const temp = document.createElement('div');
+            temp.innerHTML = htmlString.trim();
+            const el = temp.firstChild;
+            
+            // Clean classes before storing raw HTML
+            el.classList.remove('canvas-element', 'selected', 'multi-selected', 'is-dragging', 'selected-node');
+            
+            const elState = {
+                id: id,
+                type: type,
+                name: defaultName || (components.find(c => c.type === type)?.name || 'Block'),
+                position: { x, y },
+                z: type === 'floating-nav' ? 100 : (type === 'section' ? 0 : 10),
+                html: el.outerHTML,
+                customCss: `/* Styles for ${id} */`
+            };
+
+            if (undoStack.length === 0) saveHistory(); // Initial save
+            builderState.pages[builderState.currentPage].elements.push(elState);
+            saveHistory();
+            renderCanvasFromState();
+            
+            // Auto-select the newly added element
+            setTimeout(() => {
+                const newEl = document.getElementById(id);
+                if (newEl) selectElement(newEl, newEl);
+            }, 50);
+        }
+
+        function syncDomToState(wrapper) {
+            if(!wrapper) return;
+            let elState = builderState.pages[builderState.currentPage].elements.find(e => e.id === wrapper.id);
+            if (!elState) return;
+
+            elState.position.x = parseFloat(wrapper.style.left) || 0;
+            elState.position.y = parseFloat(wrapper.style.top) || 0;
+            elState.z = parseInt(wrapper.style.zIndex) || 10;
+
+            const clone = wrapper.cloneNode(true);
+            clone.classList.remove('canvas-element', 'selected', 'multi-selected', 'is-dragging');
+            clone.removeAttribute('draggable');
+            const deepSel = clone.querySelector('.selected-node');
+            if(deepSel) deepSel.classList.remove('selected-node');
+
+            elState.html = clone.outerHTML;
+
+            const styleTag = document.getElementById(`style-${wrapper.id}`);
+            if (styleTag) elState.customCss = styleTag.innerHTML;
+        }
+
+        function renderCanvasFromState() {
+            // Clean canvas but keep guides
+            canvas.innerHTML = '<div id="guide-v" class="smart-guide"></div><div id="guide-h" class="smart-guide"></div>';
+            document.querySelectorAll('style[id^="style-el-"]').forEach(s => s.remove());
+
+            const elements = builderState.pages[builderState.currentPage].elements;
+            
+            elements.forEach(elState => {
+                const temp = document.createElement('div');
+                temp.innerHTML = elState.html; 
+                const el = temp.firstChild;
+
+                el.id = elState.id;
+                el.classList.add('canvas-element');
+                el.dataset.type = elState.type;
+                
+                // Render Full Bleeds in builder safely within 1440px
+                if (['navbar', 'footer', 'hero-split', 'section'].includes(elState.type)) {
+                    el.classList.add('is-full-bleed');
+                    elState.position.x = 0; // Lock state X
+                }
+
+                el.style.left = elState.position.x + 'px';
+                el.style.top = elState.position.y + 'px';
+                el.style.zIndex = elState.z;
+                
+                canvas.appendChild(el);
+
+                const styleTag = document.createElement('style');
+                styleTag.id = `style-${el.id}`;
+                styleTag.innerHTML = elState.customCss;
+                document.head.appendChild(styleTag);
+            });
+
+            selectedWrappers = [];
+            selectedNode = null;
+            deselectElement();
+        }
+
+        // --- Page Management ---
+        function createNewPage() {
+            const modal = document.getElementById('new-page-modal');
+            const modalContent = document.getElementById('new-page-modal-content');
+            const input = document.getElementById('new-page-input');
+            
+            input.value = '';
+            modal.classList.remove('hidden');
+            
+            setTimeout(() => {
+                modal.classList.remove('opacity-0');
+                modalContent.classList.remove('scale-95');
+                input.focus();
+            }, 10);
+        }
+
+        function closeNewPageModal() {
+            const modal = document.getElementById('new-page-modal');
+            const modalContent = document.getElementById('new-page-modal-content');
+            
+            modal.classList.add('opacity-0');
+            modalContent.classList.add('scale-95');
+            
+            setTimeout(() => {
+                modal.classList.add('hidden');
+            }, 300);
+        }
+
+        function confirmNewPage() {
+            const input = document.getElementById('new-page-input');
+            let pageName = input.value.trim();
+            
+            if (!pageName) {
+                alert("Please enter a page path.");
+                return;
+            }
+            
+            // Format to route-friendly string
+            if (!pageName.startsWith('/')) pageName = '/' + pageName;
+            const pageId = pageName.replace('/', '').toLowerCase().replace(/[^a-z0-9]/g, '-') || 'home';
+            
+            if (builderState.pages[pageId]) { 
+                alert("Page path already exists!"); 
+                return; 
+            }
+
+            builderState.pages[pageId] = { id: pageId, name: pageName, elements: [] };
+            
+            const selector = document.getElementById('page-selector');
+            const option = document.createElement('option');
+            option.value = pageId;
+            option.text = pageName;
+            selector.appendChild(option);
+            
+            selector.value = pageId;
+            switchPage(pageId);
+            
+            closeNewPageModal();
+        }
+
+        function switchPage(pageId) {
+            builderState.currentPage = pageId;
+            undoStack = [];
+            redoStack = [];
+            saveHistory(); // Start history for new page
+            renderCanvasFromState();
+            
+            // Update page path input in empty state
+            const pageInput = document.getElementById('page-path-input');
+            if(pageInput && builderState.pages[pageId]) {
+                pageInput.value = builderState.pages[pageId].name;
+            }
+        }
+        
+        function updatePagePath(val) {
+            if (!val.startsWith('/')) val = '/' + val;
+            
+            // Check for duplicate path
+            const isDuplicate = Object.values(builderState.pages).some(p => p.name === val && p.id !== builderState.currentPage);
+            if(isDuplicate) {
+                alert("This path is already in use by another page.");
+                document.getElementById('page-path-input').value = builderState.pages[builderState.currentPage].name;
+                return;
+            }
+            
+            builderState.pages[builderState.currentPage].name = val;
+            
+            // Update the selector dropdown visual text
+            const selector = document.getElementById('page-selector');
+            const option = selector.querySelector(`option[value="${builderState.currentPage}"]`);
+            if(option) option.text = val;
+        }
+
+        // --- UX Features ---
+        function toggleSnap() {
+            snapEnabled = !snapEnabled;
+            const btn = document.getElementById('snap-toggle');
+            if (snapEnabled) {
+                btn.classList.add('text-blue-600', 'bg-blue-50');
+            } else {
+                btn.classList.remove('text-blue-600', 'bg-blue-50');
+            }
+        }
+
+        function updateElementName(newName) {
+            if (selectedWrappers.length === 1) {
+                let elState = builderState.pages[builderState.currentPage].elements.find(e => e.id === selectedWrappers[0].id);
+                if (elState) {
+                    elState.name = newName;
+                    debouncedSaveHistory();
+                }
+            }
+        }
+
+        // --- Context Menu ---
+        function setupContextMenu() {
+            const menu = document.getElementById('context-menu');
+            
+            document.addEventListener('contextmenu', e => {
+                if(document.body.classList.contains('preview-mode')) return;
+                const wrapper = e.target.closest('.canvas-element');
+                
+                if (wrapper) {
+                    e.preventDefault();
+                    if (!selectedWrappers.includes(wrapper)) {
+                        selectElement(e.target, wrapper);
+                    }
+                    menu.style.left = e.clientX + 'px';
+                    menu.style.top = e.clientY + 'px';
+                    menu.classList.remove('hidden');
+                } else {
+                    menu.classList.add('hidden');
+                }
+            });
+
+            document.addEventListener('click', e => {
+                if (!e.target.closest('#context-menu')) {
+                    menu.classList.add('hidden');
+                }
+            });
+        }
+
+        function ctxDuplicate() { duplicateElement(); document.getElementById('context-menu').classList.add('hidden'); }
+        function ctxDelete() { deleteElementWrapper(); document.getElementById('context-menu').classList.add('hidden'); }
+        function ctxBringFront() { adjustZIndex('front'); document.getElementById('context-menu').classList.add('hidden'); }
+        function ctxSendBack() { adjustZIndex('back'); document.getElementById('context-menu').classList.add('hidden'); }
+
+
+        // --- VISUAL SCALING ENGINE ---
+        function updateCanvasScale() {
+            if (!canvasWrapper || !canvasScaler || !canvas) return;
+
+            const isPreview = document.body.classList.contains('preview-mode');
+            const padding = isPreview ? 0 : 80; 
+            const availableWidth = canvasWrapper.clientWidth - padding;
+            
+            currentScale = availableWidth < 1440 ? availableWidth / 1440 : 1;
+            document.documentElement.style.setProperty('--canvas-scale', currentScale);
+            
+            if (isPreview) {
+                currentScale = Math.min(1, canvasWrapper.clientWidth / 1440); 
+                document.getElementById('canvas-label').style.display = 'none';
+                canvasScaler.style.marginTop = '0';
+                canvasScaler.style.marginBottom = '0';
+            } else {
+                document.getElementById('canvas-label').style.display = 'block';
+                canvasScaler.style.marginTop = '3rem';
+                canvasScaler.style.marginBottom = '3rem';
+            }
+
+            canvas.style.transform = `scale(${currentScale})`;
+            canvasScaler.style.width = `${1440 * currentScale}px`;
+            canvasScaler.style.height = `${3000 * currentScale}px`;
+        }
+
+        // --- Sidebar Render ---
+        function renderComponentList() {
+            const list = document.getElementById('component-list');
+            list.innerHTML = '';
+            
+            const grouped = components.reduce((acc, comp) => {
+                acc[comp.category] = acc[comp.category] || [];
+                acc[comp.category].push(comp);
+                return acc;
+            }, {});
+
+            for (const category in grouped) {
+                const catContainer = document.createElement('div');
+                catContainer.className = 'border-b border-slate-100';
+                
+                catContainer.innerHTML = `
+                    <div class="px-5 py-4 bg-white flex justify-between items-center cursor-pointer hover:bg-slate-50 transition group" onclick="this.nextElementSibling.classList.toggle('hidden'); this.querySelector('.fa-chevron-down').classList.toggle('rotate-180')">
+                        <h3 class="text-xs text-slate-800 font-bold uppercase tracking-wider group-hover:text-blue-600 transition">${category}</h3>
+                        <i class="fas fa-chevron-down text-slate-400 text-xs transition-transform duration-200"></i>
+                    </div>
+                    <div class="px-4 pb-4 space-y-1.5 block"></div>
+                `;
+                
+                const itemContainer = catContainer.querySelector('div:last-child');
+
+                grouped[category].forEach(comp => {
+                    const btn = document.createElement('div');
+                    btn.className = 'flex items-center p-3 bg-white hover:bg-blue-50 border border-slate-100 hover:border-blue-300 rounded-lg cursor-grab transition-all group shadow-sm';
+                    btn.draggable = true;
+                    
+                    btn.ondragstart = (e) => {
+                        e.dataTransfer.setData('text/plain', comp.type);
+                        btn.classList.add('dragging-component');
+                    };
+                    btn.ondragend = () => {
+                        btn.classList.remove('dragging-component');
+                    };
+                    
+                    btn.innerHTML = `
+                        <div class="w-10 h-10 rounded bg-slate-50 text-slate-400 group-hover:bg-blue-600 group-hover:text-white flex items-center justify-center transition mr-3 border border-slate-100 group-hover:border-blue-600 shrink-0 text-lg">
+                            <i class="fas ${comp.icon}"></i>
+                        </div>
+                        <span class="text-sm font-bold text-slate-600 group-hover:text-blue-900">${comp.name}</span>
+                    `;
+                    itemContainer.appendChild(btn);
+                });
+                list.appendChild(catContainer);
+            }
+        }
+
+        function filterComponents() {
+            const term = document.getElementById('component-search').value.toLowerCase();
+            const list = document.getElementById('component-list');
+            Array.from(list.children).forEach(cat => {
+                let hasVisibleItems = false;
+                const itemsContainer = cat.querySelector('div:last-child');
+                const items = itemsContainer.querySelectorAll('.cursor-grab');
+                items.forEach(item => {
+                    if (item.innerText.toLowerCase().includes(term)) { item.style.display = 'flex'; hasVisibleItems = true; }
+                    else { item.style.display = 'none'; }
+                });
+                cat.style.display = hasVisibleItems ? 'block' : 'none';
+                if(term && hasVisibleItems) { itemsContainer.classList.remove('hidden'); cat.querySelector('.fa-chevron-down').classList.add('rotate-180'); }
+            });
+        }
+
+        // --- Drag From Sidebar to Canvas ---
+        function allowDrop(e) { e.preventDefault(); }
+
+        function handleDropFromSidebar(e) {
+            e.preventDefault();
+            const type = e.dataTransfer.getData('text/plain');
+            const compData = components.find(c => c.type === type);
+            if (!compData) return;
+
+            const rect = canvas.getBoundingClientRect();
+            let x = (e.clientX - rect.left) / currentScale;
+            let y = (e.clientY - rect.top) / currentScale;
+
+            const temp = document.createElement('div');
+            temp.innerHTML = compData.html.trim();
+            const el = temp.firstChild;
+            canvas.appendChild(el);
+            
+            setTimeout(() => {
+                const w = el.offsetWidth || 100;
+                const isFullBleedType = ['navbar', 'footer', 'hero-split', 'section'].includes(type);
+                
+                if (type === 'floating-nav') { x = (1440 - w) / 2; y = 20; } 
+                else if(isFullBleedType) { x = 0; }
+                
+                el.remove(); 
+                addElementToState(compData.html, x, y, type);
+            }, 10);
+        }
+
+        // --- Core Interactions (Multi-select + Guides + Preview Routing) ---
+        function setupCanvasInteractions() {
+            canvas.addEventListener('click', (e) => {
+                if(!document.body.classList.contains('preview-mode')) {
+                    e.preventDefault(); 
+                } else {
+                    const linkNode = e.target.closest('[data-href]');
+                    if (linkNode) {
+                        e.preventDefault();
+                        const target = linkNode.getAttribute('data-href');
+                        if (target && target.startsWith('/')) {
+                            const pageEntry = Object.values(builderState.pages).find(p => p.name === target);
+                            if (pageEntry) {
+                                document.getElementById('page-selector').value = pageEntry.id;
+                                switchPage(pageEntry.id);
+                            } else {
+                                alert('Page "' + target + '" does not exist yet. Add it using the + button.');
+                            }
+                        }
+                    }
+                }
+            });
+
+            canvas.addEventListener('mousedown', (e) => {
+                if(document.body.classList.contains('preview-mode')) return; 
+
+                if(e.target === canvas || e.target.id === 'canvas-wrapper' || e.target.classList.contains('smart-guide') || e.target.id === 'canvas-scaler') {
+                    deselectElement();
+                    return;
+                }
+
+                const wrapper = e.target.closest('.canvas-element');
+                if (wrapper && e.button === 0) {
+                    e.preventDefault();
+
+                    let exactNode = e.target;
+                    if(exactNode.tagName.toLowerCase() === 'path' || exactNode.tagName.toLowerCase() === 'svg') {
+                        exactNode = exactNode.closest('svg') || exactNode;
+                        if(exactNode.parentElement && ['button', 'a'].includes(exactNode.parentElement.tagName.toLowerCase())) {
+                            exactNode = exactNode.parentElement;
+                        }
+                    }
+
+                    // Multi-Select Logic
+                    if (e.shiftKey) {
+                        if (!selectedWrappers.includes(wrapper)) {
+                            selectedWrappers.push(wrapper);
+                            wrapper.classList.add('multi-selected');
+                        } else {
+                            selectedWrappers = selectedWrappers.filter(w => w !== wrapper);
+                            wrapper.classList.remove('multi-selected');
+                        }
+                        // Update UI for multi-select
+                        if (selectedWrappers.length > 1) {
+                            document.getElementById('selected-type').innerHTML = `<i class="fas fa-layer-group mr-2 opacity-70"></i> ${selectedWrappers.length} Elements`;
+                            
+                            // Using Explicit Display Override
+                            document.getElementById('properties-content').style.display = 'none';
+                            document.getElementById('no-selection-msg').style.display = 'flex';
+                        }
+                    } else {
+                        if (!selectedWrappers.includes(wrapper)) {
+                            selectElement(exactNode, wrapper);
+                        }
+                    }
+
+                    if (selectedWrappers.length > 0) {
+                        isDraggingCanvasElement = true;
+                        startCursorX = e.clientX;
+                        startCursorY = e.clientY;
+                        
+                        dragInitialPositions = selectedWrappers.map(w => ({
+                            el: w,
+                            x: parseFloat(w.style.left) || 0,
+                            y: parseFloat(w.style.top) || 0
+                        }));
+                        
+                        selectedWrappers.forEach(w => w.classList.add('is-dragging'));
+                    }
+                }
+            });
+
+            window.addEventListener('mousemove', (e) => {
+                if (!isDraggingCanvasElement || selectedWrappers.length === 0) return;
+
+                const dx = (e.clientX - startCursorX) / currentScale;
+                const dy = (e.clientY - startCursorY) / currentScale;
+                
+                let guideXShown = false;
+                let guideYShown = false;
+                guideV.style.display = 'none';
+                guideH.style.display = 'none';
+
+                dragInitialPositions.forEach(item => {
+                    let newX = item.x + dx;
+                    let newY = item.y + dy;
+
+                    if (snapEnabled) {
+                        newX = Math.round(newX / GRID_SIZE) * GRID_SIZE;
+                        newY = Math.round(newY / GRID_SIZE) * GRID_SIZE;
+                    }
+
+                    const w = item.el.offsetWidth;
+                    const h = item.el.offsetHeight;
+
+                    if (item.el.classList.contains('is-full-bleed')) {
+                        newX = 0; // Lock horizontal axis for full bleed backgrounds inside builder
+                    } else {
+                        if (newX < 0) newX = 0;
+                        if (newX + w > canvas.offsetWidth) newX = canvas.offsetWidth - w;
+                    }
+
+                    if (newY < 0) newY = 0;
+                    if (newY + h > canvas.offsetHeight) newY = canvas.offsetHeight - h;
+
+                    if (selectedWrappers.length === 1 && !snapEnabled && !item.el.classList.contains('is-full-bleed')) {
+                        let centerX = newX + (w / 2);
+                        let canvasCenterX = canvas.offsetWidth / 2;
+                        let snapThreshold = 15 / currentScale; 
+                        
+                        if (Math.abs(centerX - canvasCenterX) < snapThreshold && w < canvas.offsetWidth - 10) {
+                            newX = canvasCenterX - (w / 2);
+                            guideV.style.display = 'block';
+                        }
+                    }
+
+                    item.el.style.left = newX + 'px';
+                    item.el.style.top = newY + 'px';
+                });
+            });
+
+            window.addEventListener('mouseup', () => {
+                if (isDraggingCanvasElement && selectedWrappers.length > 0) {
+                    selectedWrappers.forEach(w => {
+                        w.classList.remove('is-dragging');
+                        syncDomToState(w);
+                    });
+                    saveHistory();
+                }
+                isDraggingCanvasElement = false;
+                guideV.style.display = 'none'; 
+                guideH.style.display = 'none';
+            });
+        }
+
+        // --- Safe Tab Switching Engine ---
+        function switchTab(tabId) {
+            try {
+                // 1. Reset all buttons
+                const btns = document.querySelectorAll('.tab-btn');
+                for (let i = 0; i < btns.length; i++) {
+                    btns[i].classList.remove('text-blue-600', 'border-blue-600');
+                    btns[i].classList.add('text-slate-500', 'border-transparent');
+                    
+                    if (btns[i].textContent.toLowerCase().includes(tabId)) {
+                        btns[i].classList.remove('text-slate-500', 'border-transparent');
+                        btns[i].classList.add('text-blue-600', 'border-blue-600');
+                    }
+                }
+
+                // 2. Hide all tab panes safely via inline styles
+                const panes = document.querySelectorAll('.tab-pane');
+                for (let i = 0; i < panes.length; i++) {
+                    panes[i].style.display = 'none';
+                }
+
+                // 3. Show target pane safely via inline styles
+                const target = document.getElementById('tab-' + tabId);
+                if (target) {
+                    target.style.display = 'block';
+                }
+            } catch (e) {
+                console.error("Tab switch error safely caught:", e);
+            }
+        }
+
+        // --- Selection & Panel Management ---
+        function selectElement(exactNode, wrapper) {
+            selectedWrappers.forEach(w => w.classList.remove('multi-selected', 'selected'));
+            if (selectedNode) selectedNode.classList.remove('selected-node');
+            
+            selectedWrappers = [wrapper];
+            selectedNode = exactNode;
+            
+            selectedNode.classList.add('selected-node');
+            wrapper.classList.add('selected'); 
+            
+            // Safe Panel Display Swap
+            document.getElementById('no-selection-msg').style.display = 'none';
+            document.getElementById('properties-content').style.display = 'flex';
+            
+            let tag = selectedNode.tagName.toLowerCase();
+            let displayType = tag.toUpperCase();
+            if (tag === 'div' && selectedNode === wrapper) displayType = 'CONTAINER BLOCK';
+            if (tag === 'p') displayType = 'TEXT PARAGRAPH';
+            
+            let elState = builderState.pages[builderState.currentPage].elements.find(e => e.id === wrapper.id);
+            if (elState) {
+                document.getElementById('prop-el-name').value = elState.name;
+                displayType = elState.name;
+            }
+
+            document.getElementById('selected-type').innerHTML = `<i class="fas fa-layer-group mr-2 opacity-70"></i> ${displayType}`;
+
+            // Force resetting to Design tab securely on selection
+            switchTab('design');
+
+            populatePropertiesPanel();
+        }
+
+        function deselectElement() {
+            selectedWrappers.forEach(w => w.classList.remove('multi-selected', 'selected'));
+            if (selectedNode) selectedNode.classList.remove('selected-node');
+            
+            selectedWrappers = [];
+            selectedNode = null;
+            
+            // Safe Panel Display Swap
+            document.getElementById('properties-content').style.display = 'none';
+            document.getElementById('no-selection-msg').style.display = 'flex';
+            
+            document.getElementById('selected-type').innerHTML = `<i class="fas fa-mouse-pointer mr-2 opacity-70"></i> No Selection`;
+            
+            const pageInput = document.getElementById('page-path-input');
+            if(pageInput && builderState.pages[builderState.currentPage]) {
+                pageInput.value = builderState.pages[builderState.currentPage].name;
+            }
+        }
+
+        function populatePropertiesPanel() {
+            if (!selectedNode) return;
+            const style = window.getComputedStyle(selectedNode);
+            
+            document.getElementById('prop-width').value = selectedNode.style.width || '';
+            document.getElementById('prop-height').value = selectedNode.style.height || '';
+            
+            document.getElementById('prop-pt').value = selectedNode.style.paddingTop || '';
+            document.getElementById('prop-pr').value = selectedNode.style.paddingRight || '';
+            document.getElementById('prop-pb').value = selectedNode.style.paddingBottom || '';
+            document.getElementById('prop-pl').value = selectedNode.style.paddingLeft || '';
+
+            document.getElementById('prop-mt').value = selectedNode.style.marginTop || '';
+            document.getElementById('prop-mr').value = selectedNode.style.marginRight || '';
+            document.getElementById('prop-mb').value = selectedNode.style.marginBottom || '';
+            document.getElementById('prop-ml').value = selectedNode.style.marginLeft || '';
+
+            const tag = selectedNode.tagName.toLowerCase();
+            const typoPanel = document.getElementById('typography-panel');
+            
+            if (['img', 'iframe', 'video', 'svg', 'path'].includes(tag)) {
+                typoPanel.style.display = 'none';
+            } else {
+                typoPanel.style.display = 'block';
+                const currentFont = selectedNode.style.fontFamily;
+                const fontSelect = document.getElementById('prop-fontfamily');
+                if([...fontSelect.options].some(o => o.value === currentFont)) {
+                    fontSelect.value = currentFont;
+                } else { fontSelect.value = ""; }
+                
+                document.getElementById('prop-fontsize').value = selectedNode.style.fontSize || '';
+                
+                const fw = selectedNode.style.fontWeight || style.fontWeight;
+                const fwSelect = document.getElementById('prop-fontweight');
+                fwSelect.value = ["300","400","500","600","700","900"].includes(fw) ? fw : "";
+                
+                let rgb = selectedNode.style.color || style.color;
+                document.getElementById('prop-color-text').value = rgb;
+            }
+
+            document.getElementById('prop-bgcolor-text').value = selectedNode.style.backgroundColor || '';
+            document.getElementById('prop-radius').value = selectedNode.style.borderRadius || '';
+            document.getElementById('prop-border').value = selectedNode.style.border || '';
+
+            // Using inline styles to override Tailwind correctly
+            const textGroup = document.getElementById('content-quick-text-group');
+            const srcGroup = document.getElementById('content-src-group');
+            const hrefGroup = document.getElementById('content-href-group');
+            const inputGroup = document.getElementById('content-input-group');
+            
+            textGroup.style.display = 'none';
+            srcGroup.style.display = 'none';
+            hrefGroup.style.display = 'none';
+            inputGroup.style.display = 'none';
+
+            if (['img', 'video', 'iframe'].includes(tag)) {
+                srcGroup.style.display = 'block';
+                document.getElementById('prop-src').value = selectedNode.src || '';
+                const preview = document.getElementById('preview-image');
+                if(tag === 'img') { preview.src = selectedNode.src; preview.style.display = 'block'; }
+                else { preview.style.display = 'none'; }
+            } 
+            
+            hrefGroup.style.display = 'block';
+            if (tag === 'a') {
+                document.getElementById('prop-href').value = selectedNode.href || '#';
+            } else {
+                document.getElementById('prop-href').value = selectedNode.getAttribute('data-href') || '';
+            }
+
+            if (['input', 'textarea'].includes(tag)) {
+                inputGroup.style.display = 'block';
+                document.getElementById('prop-placeholder').value = selectedNode.placeholder || '';
+                document.getElementById('prop-value').value = selectedNode.value || '';
+            }
+
+            // Always provide the ability to edit the element's inner HTML unless it's a closed tag
+            if (!['img', 'iframe', 'video', 'input', 'textarea', 'hr', 'br', 'svg', 'path'].includes(tag)) {
+                textGroup.style.display = 'block';
+                document.getElementById('prop-quicktext').value = selectedNode.innerHTML.trim();
+            }
+
+            // Tag display logic
+            document.getElementById('prop-node-tag').value = `<${tag}>`;
+        }
+
+        function updateStyle(prop, value) {
+            if (!selectedNode) return;
+            selectedNode.style[prop] = value;
+            syncDomToState(selectedWrappers[0]);
+            debouncedSaveHistory();
+        }
+
+        function updateContent(prop, value) {
+            if (!selectedNode) return;
+            if (prop === 'innerHTML') {
+                selectedNode.innerHTML = value;
+            } else if (prop === 'src') {
+                if (!value && selectedNode.tagName.toLowerCase() === 'iframe') {
+                    value = 'about:blank'; 
+                }
+                selectedNode.src = value;
+                if(selectedNode.tagName.toLowerCase() === 'img') document.getElementById('preview-image').src = value;
+            } else if (prop === 'href') {
+                if (selectedNode.tagName.toLowerCase() === 'a') {
+                    selectedNode.href = value;
+                } else {
+                    if (value) {
+                        selectedNode.setAttribute('data-href', value);
+                        selectedNode.classList.add('hover-link');
+                    } else {
+                        selectedNode.removeAttribute('data-href');
+                        selectedNode.classList.remove('hover-link');
+                    }
+                }
+            } else if (prop === 'placeholder') {
+                selectedNode.placeholder = value;
+            } else if (prop === 'value') {
+                selectedNode.value = value;
+                selectedNode.setAttribute('value', value);
+                if (selectedNode.tagName.toLowerCase() === 'textarea') selectedNode.innerHTML = value;
+            }
+            syncDomToState(selectedWrappers[0]);
+            debouncedSaveHistory();
+        }
+
+        function handleImageUpload(e) {
+            const file = e.target.files[0];
+            if (!file || !selectedNode) return;
+            
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                const base64Data = event.target.result;
+                if (['img', 'video', 'iframe'].includes(selectedNode.tagName.toLowerCase())) {
+                    selectedNode.src = base64Data;
+                    if(selectedNode.tagName.toLowerCase() === 'img') {
+                        document.getElementById('preview-image').src = base64Data;
+                        document.getElementById('preview-image').classList.remove('hidden');
+                    }
+                    document.getElementById('prop-src').value = ''; 
+                } else {
+                    // If they upload an image to a div, set it as background
+                    selectedNode.style.backgroundImage = `url(${base64Data})`;
+                    selectedNode.style.backgroundSize = 'cover';
+                    selectedNode.style.backgroundPosition = 'center';
+                }
+                syncDomToState(selectedWrappers[0]);
+                saveHistory();
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function adjustZIndex(action) {
+            if (selectedWrappers.length === 0) return;
+            
+            selectedWrappers.forEach(w => {
+                let elState = builderState.pages[builderState.currentPage].elements.find(e => e.id === w.id);
+                if (!elState) return;
+
+                if (action === 1) elState.z += 1;
+                else if (action === -1) elState.z -= 1;
+                else if (action === 'front') elState.z = 90; // Just below floating nav
+                else if (action === 'back') elState.z = 1;
+                
+                w.style.zIndex = elState.z;
+                syncDomToState(w);
+            });
+            saveHistory();
+        }
+
+        function deleteElementWrapper() {
+            if (selectedWrappers.length === 0) return;
+            const idsToDelete = selectedWrappers.map(w => w.id);
+            builderState.pages[builderState.currentPage].elements = builderState.pages[builderState.currentPage].elements.filter(e => !idsToDelete.includes(e.id));
+            saveHistory();
+            renderCanvasFromState();
+        }
+
+        function duplicateElement() {
+            if (selectedWrappers.length === 0) return;
+            
+            selectedWrappers.forEach(w => {
+                let originalState = builderState.pages[builderState.currentPage].elements.find(e => e.id === w.id);
+                if (originalState) {
+                    addElementToState(originalState.html, originalState.position.x + 20, originalState.position.y + 20, originalState.type, originalState.name + ' Copy');
+                }
+            });
+        }
+
+        function clearCanvas() {
+            if(confirm("Are you sure you want to clear this page?")) {
+                builderState.pages[builderState.currentPage].elements = [];
+                saveHistory();
+                renderCanvasFromState();
+            }
+        }
+
+        // --- Modals & Exports Responsive Engine ---
+        function openExportModal() {
+            deselectElement(); 
+            const btn = document.getElementById('publish-btn');
+            const originalHTML = btn.innerHTML;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Compiling...';
+            
+            setTimeout(() => {
+                btn.innerHTML = originalHTML;
+                
+                let allPagesHtml = '';
+                
+                // Build HTML for all pages
+                Object.values(builderState.pages).forEach((page, index) => {
+                    const display = page.name === '/home' || index === 0 ? 'flex' : 'none';
+                    let pageHtml = `<div id="page-${page.id}" data-path="${page.name}" class="page-container" style="display: ${display};">`;
+                    
+                    // Sort elements vertically to establish natural stacking order for mobile view!
+                    const sortedElements = [...page.elements].sort((a, b) => a.position.y - b.position.y);
+
+                    sortedElements.forEach(elState => {
+                        const temp = document.createElement('div');
+                        temp.innerHTML = elState.html;
+                        const el = temp.firstChild;
+                        
+                        const isFullBleed = ['navbar', 'footer', 'hero-split', 'section'].includes(elState.type);
+                        
+                        // Desktop positioning structure (mobile handles via CSS override)
+                        if (elState.type === 'floating-nav') {
+                            el.style.position = 'fixed';
+                            el.style.top = '20px';
+                            el.style.left = '50%';
+                            el.style.transform = 'translateX(-50%)';
+                            el.style.zIndex = '9999';
+                        } else if (isFullBleed) {
+                            el.style.position = 'absolute';
+                            el.style.left = '0';
+                            el.style.width = '100vw'; // Stretch fully across any browser
+                            el.style.top = elState.position.y + 'px';
+                            el.style.zIndex = elState.z;
+                        } else {
+                            el.style.position = 'absolute';
+                            // Center absolute elements securely on wide monitors perfectly
+                            el.style.left = `calc(50vw - 720px + ${elState.position.x}px)`;
+                            el.style.top = elState.position.y + 'px';
+                            el.style.zIndex = elState.z;
+                        }
+                        
+                        el.classList.remove('canvas-element', 'selected', 'multi-selected', 'is-dragging', 'selected-node', 'is-full-bleed');
+                        if (el.className.trim() === '') el.removeAttribute('class');
+                        
+                        // Failsafe iframe fix to prevent infinite self-loading crash
+                        if (el.tagName.toLowerCase() === 'iframe' && (!el.src || el.src === window.location.href)) {
+                            el.src = 'about:blank';
+                        }
+                        const innerIframes = el.querySelectorAll('iframe');
+                        innerIframes.forEach(ifr => {
+                            if (!ifr.src || ifr.src === window.location.href) ifr.src = 'about:blank';
+                        });
+                        
+                        pageHtml += el.outerHTML;
+                    });
+                    pageHtml += `</div>`;
+                    allPagesHtml += pageHtml;
+                });
+
+                const scriptStart = '<' + 'script src="https://cdn.tailwindcss.com">' + '<' + '/script>';
+                const linkScriptStart = '<' + 'script>';
+                const linkScriptEnd = '<' + '/script>';
+
+                const finalCode = `<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>My Airake Site</title>
+    <!-- Tailwind CSS (Warning: CDN is fine for local downloaded files and prototyping) -->
+    ${scriptStart}
+    <!-- FontAwesome for Icons -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        body { margin: 0; padding: 0; background-color: #ffffff; font-family: 'Inter', sans-serif; overflow-x: hidden; min-height: 100vh; }
+        #site-wrapper { position: relative; width: 100vw; min-height: 100vh; margin: 0; overflow-x: hidden; }
+        
+        .page-container {
+            width: 100vw;
+            min-height: 100vh;
+            position: relative;
+        }
+
+        .hover-link { cursor: pointer; transition: opacity 0.3s ease, transform 0.3s ease; }
+        .hover-link:hover { opacity: 0.7; }
+
+        /* Powerful Mobile Stacking Engine */
+        @media (max-width: 1024px) {
+            .page-container {
+                display: flex !important;
+                flex-direction: column !important;
+                align-items: center !important;
+                padding: 1rem 0 !important;
+                gap: 2rem !important;
+                overflow-x: hidden !important;
+            }
+            .page-container > * {
+                position: relative !important;
+                left: auto !important;
+                top: auto !important;
+                transform: none !important;
+                max-width: 100vw !important;
+                margin: 0 auto !important;
+            }
+            /* Override to make components fill width properly on mobile */
+            .page-container > nav, 
+            .page-container > footer, 
+            .page-container > div {
+                width: 100vw !important;
+                padding-left: 1rem !important;
+                padding-right: 1rem !important;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div id="site-wrapper">
+${allPagesHtml}
+    </div>
+    ${linkScriptStart}
+        // Native SPA Page Router & Link Handler
+        document.addEventListener('click', function(e) {
+            const linkNode = e.target.closest('[data-href]');
+            if (linkNode) {
+                e.preventDefault(); 
+                const target = linkNode.getAttribute('data-href');
+                if (!target) return;
+                
+                // Internal SPA routing for downloaded file security
+                if (target.startsWith('/')) {
+                    const targetPage = document.querySelector('.page-container[data-path="' + target + '"]');
+                    if(targetPage) { 
+                        document.querySelectorAll('.page-container').forEach(el => el.style.display = 'none');
+                        targetPage.style.display = 'flex'; // Use flex for proper structure
+                        window.scrollTo(0,0); 
+                    } else {
+                        console.warn("Airake Router: Page '" + target + "' does not exist.");
+                    }
+                } else if (target.startsWith('#')) {
+                    const targetPage = document.querySelector(target);
+                    if(targetPage) { 
+                        window.scrollTo({ top: targetPage.offsetTop, behavior: 'smooth' });
+                    }
+                } else {
+                    window.open(target, '_blank'); 
+                }
+            }
+        });
+        
+        // Show proper home page securely on load
+        window.addEventListener('load', function() {
+            document.querySelectorAll('.page-container').forEach(el => el.style.display = 'none');
+            const startPage = document.querySelector('.page-container[data-path="/home"]') || document.querySelector('.page-container');
+            if(startPage) startPage.style.display = 'flex';
+        });
+    ${linkScriptEnd}
+</body>
+</html>`;
+
+                document.getElementById('export-code-area').value = finalCode;
+                const modal = document.getElementById('export-modal');
+                const modalContent = document.getElementById('export-modal-content');
+                modal.classList.remove('hidden');
+                
+                setTimeout(() => {
+                    modal.classList.remove('opacity-0');
+                    modalContent.classList.remove('scale-95');
+                }, 10);
+
+            }, 400); 
+        }
+
+        function closeExportModal() {
+            const modal = document.getElementById('export-modal');
+            const modalContent = document.getElementById('export-modal-content');
+            modal.classList.add('opacity-0');
+            modalContent.classList.add('scale-95');
+            setTimeout(() => { modal.classList.add('hidden'); }, 300);
+        }
+
+        function copyExportedCode() {
+            const copyText = document.getElementById("export-code-area");
+            copyText.select();
+            document.execCommand('copy');
+            const btn = event.currentTarget;
+            const originalHTML = btn.innerHTML;
+            btn.innerHTML = '<i class="fas fa-check mr-2"></i>Copied!';
+            btn.classList.replace('text-slate-700', 'text-green-600');
+            setTimeout(() => {
+                btn.innerHTML = originalHTML;
+                btn.classList.replace('text-green-600', 'text-slate-700');
+            }, 2000);
+        }
+
+        function triggerFileDownload() {
+            const code = document.getElementById("export-code-area").value;
+            try {
+                const blob = new Blob([code], { type: "text/html" });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement("a");
+                a.style.display = "none";
+                a.href = url;
+                a.download = "my-airake-site.html";
+                document.body.appendChild(a);
+                a.click();
+                setTimeout(() => {
+                    document.body.removeChild(a);
+                    URL.revokeObjectURL(url);
+                }, 100);
+            } catch (e) {
+                console.error("Download failed:", e);
+                alert("Download blocked. Please copy code.");
+            }
+        }
+
+        function toggleSidebar(side) {
+            if (side === 'left') document.getElementById('left-sidebar').classList.toggle('sidebar-left-collapsed');
+            else document.getElementById('properties-panel').classList.toggle('sidebar-right-collapsed');
+            let start = Date.now();
+            let timer = setInterval(() => { updateCanvasScale(); if (Date.now() - start > 350) clearInterval(timer); }, 16);
+        }
+
+        function togglePreviewMode() {
+            deselectElement();
+            const body = document.body;
+            const btn = document.getElementById('preview-btn');
+            const text = document.getElementById('preview-text');
+            
+            body.classList.toggle('preview-mode');
+            if(body.classList.contains('preview-mode')) {
+                document.getElementById('left-sidebar').classList.add('sidebar-left-collapsed');
+                document.getElementById('properties-panel').classList.add('sidebar-right-collapsed');
+                text.innerText = "Exit Preview";
+                btn.classList.replace('bg-slate-100', 'bg-blue-100');
+                btn.classList.replace('text-slate-700', 'text-blue-700');
+            } else {
+                document.getElementById('left-sidebar').classList.remove('sidebar-left-collapsed');
+                document.getElementById('properties-panel').classList.remove('sidebar-right-collapsed');
+                text.innerText = "Live Preview";
+                btn.classList.replace('bg-blue-100', 'bg-slate-100');
+                btn.classList.replace('text-blue-700', 'text-slate-700');
+            }
+            let start = Date.now();
+            let timer = setInterval(() => { updateCanvasScale(); if (Date.now() - start > 350) clearInterval(timer); }, 16);
+        }
+        
+        // Start
+        init();
+    </script>
+</body>
+</html>

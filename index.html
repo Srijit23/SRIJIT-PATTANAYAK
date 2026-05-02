@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Srijit Pattanayak | Programmer & Coder</title>
+    <link rel="stylesheet" href="style.css">
+	<link rel="icon" type="image/svg+xml" href="/logo.png" />
+</head>
+<body>
+
+    <div class="nav-wrapper animate-up">
+        <header class="floating-nav">
+            <a href="#" class="nav-brand">
+                <img src="icon.png" alt="Srijit" class="nav-profile-img">
+                <div class="logo">Airsland<span>_</span></div>
+            </a>
+            <nav class="nav-links">
+                <a href="#hero-section" class="active">
+                    <svg viewBox="0 0 24 24">
+                        <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
+                        <polyline points="9 22 9 12 15 12 15 22"></polyline>
+                    </svg>
+                    <span>Home</span>
+                </a>
+                <a href="#work">
+                    <svg viewBox="0 0 24 24">
+                        <rect x="2" y="7" width="20" height="14" rx="2" ry="2"></rect>
+                        <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"></path>
+                    </svg>
+                    <span>Work</span>
+                </a>
+                <a href="#contact">
+                    <svg viewBox="0 0 24 24">
+                        <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path>
+                        <polyline points="22,6 12,13 2,6"></polyline>
+                    </svg>
+                    <span>Contact</span>
+                </a>
+            </nav>
+            
+            <div class="nav-divider"></div>
+            
+            <!-- Nerd Mode Toggle -->
+            <div class="mode-switch-wrapper" id="mode-switch">
+                <span class="mode-label active" id="label-norm">Norm</span>
+                <div class="mode-track">
+                    <div class="mode-thumb"></div>
+                </div>
+                <span class="mode-label" id="label-nerd">Nerd</span>
+            </div>
+        </header>
+    </div>
+
+    <!-- Hero Section -->
+    <section class="hero" id="hero-section">
+        <canvas id="hero-canvas"></canvas>
+        
+        <div class="container hero-content">
+            <div class="hero-text">
+                <div class="hero-label animate-up delay-1">System Status: Online</div>
+                <h1 class="animate-up delay-1">Srijit<br><span>Pattanayak.</span></h1>
+                <p class="animate-up delay-2">I am a <span class="highlight">&lt;programmer & coder /&gt;</span> focused on developing clean architectures, immersive digital environments, and highly functional web applications.</p>
+            </div>
+            
+            <div class="hero-image-container animate-up delay-3">
+                <img src="image1.png" alt="Srijit Pattanayak" class="hero-image" draggable="false">
+            </div>
+        </div>
+    </section>
+
+    <div class="container">
+        
+        <!-- Product Branding Section -->
+        <section id="products" class="product-branding animate-up delay-3">
+            <div class="branding-card">
+                <div class="hero-label">// INTERNAL TOOLS</div>
+                <h2>Create a stunning Website without writing code.</h2>
+                <p>The most intuitive, drag-and-drop resume and portfolio builder for students, developers, and designers. Export to a clean, standalone HTML file instantly.</p>
+                
+                <div class="branding-actions">
+                    <a href="resume.html" class="btn-primary">
+                        Resume Builder 
+                        <svg viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+                    </a>
+                    <a href="webmaker.html" class="btn-secondary">
+                        Website Builder 
+                        <svg viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+                    </a>
+                </div>
+            </div>
+        </section>
+
+        <!-- Featured Projects Section -->
+        <section id="work" class="projects">
+            <div class="section-header animate-up delay-3">
+                <h2 class="section-title">Selected Works</h2>
+                <span class="section-count">[ 04 ]</span>
+            </div>
+            
+            <div class="slider-wrapper animate-up delay-3">
+                <button class="slider-btn" id="slide-left" aria-label="Previous Project">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
+                </button>
+                <button class="slider-btn" id="slide-right" aria-label="Next Project">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
+                </button>
+                
+                <div class="slider" id="projectSlider">
+                    <!-- Project 1 -->
+                    <div class="project-card">
+                        <div class="project-image-wrapper">
+                            <img src="https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&q=80&w=1200" alt="Airsland Prototype" class="project-image" draggable="false">
+                        </div>
+                        <div class="project-meta">
+                            <span>01</span>
+                            <span>React / WebGL</span>
+                        </div>
+                        <h3 class="project-title">Sayan Mandal Portfolio</h3>
+                        <p class="project-desc">A complete portfolio website designed and developed from scratch by Srijit</p>
+                        <a href="https://sayanofficial.netlify.app/" class="project-link">View Website</a>
+                    </div>
+
+                    <!-- Project 2 -->
+                    <div class="project-card">
+                        <div class="project-image-wrapper">
+                            <img src="https://images.unsplash.com/photo-1555066931-4365d14bab8c?auto=format&fit=crop&q=80&w=1200" alt="Virtual OS Ecosystem" class="project-image" draggable="false">
+                        </div>
+                        <div class="project-meta">
+                            <span>02</span>
+                            <span>HTML / Node.js</span>
+                        </div>
+                        <h3 class="project-title">Chessify - Multiplayer Chess</h3>
+                        <p class="project-desc">Advanced chess platform with multiplayer functionality and AI bots, showcasing server handling skills build and designed by Srijit</p>
+                        <a href="https://chessifyoff.netlify.app/" class="project-link">View Website</a>
+                    </div>
+
+                    <!-- Project 3 -->
+                    <div class="project-card">
+                        <div class="project-image-wrapper">
+                            <img src="https://images.unsplash.com/photo-1550745165-9bc0b252726f?auto=format&fit=crop&q=80&w=1200" alt="Custom 2D Platformer" class="project-image" draggable="false">
+                        </div>
+                        <div class="project-meta">
+                            <span>03</span>
+                            <span>Canvas / HTML</span>
+                        </div>
+                        <h3 class="project-title">AirsLand - AI Chatbot</h3>
+                        <p class="project-desc">Intelligent chatbot platform with web integration and knowledge base, showcasing AI integration skills</p>
+                        <a href="https://airsland.netlify.app/" class="project-link">Open Website</a>
+                    </div>
+
+                    <!-- Project 4 -->
+                    <div class="project-card">
+                        <div class="project-image-wrapper">
+                            <img src="https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&q=80&w=1200" alt="3D Animated Web Portal" class="project-image" draggable="false">
+                        </div>
+                        <div class="project-meta">
+                            <span>04</span>
+                            <span>HTML / CSS</span>
+                        </div>
+                        <h3 class="project-title">Ankit Jana Portfolio</h3>
+                        <p class="project-desc">Professional portfolio website for Ankit Jana, fully designed and developed by Srijit</p>
+                        <a href="https://ankitjana.netlify.app/" class="project-link">View Website</a>
+                    </div>
+
+                </div>
+            </div>
+        </section>
+
+        <!-- Let's Connect Section -->
+        <section id="contact" class="contact">
+            <div class="contact-grid">
+                <!-- Contact Info & Socials -->
+                <div class="contact-info animate-up delay-1">
+                    <h2>Let's<br>Connect.</h2>
+                    <p>Open for new opportunities, collaborations, and complex technical challenges. Let's build something functional and beautiful.</p>
+                    
+                    <div class="social-links-container">
+                        <div class="social-label">// SOCIAL INDEX</div>
+                        <div class="social-icons">
+                            <a href="https://github.com/Srijit23" aria-label="GitHub">
+                                <svg viewBox="0 0 24 24"><path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"></path></svg>
+                                <span>Github</span>
+                            </a>
+                            <a href="https://www.linkedin.com/in/srijit-pattanayak-422b552b3/" aria-label="LinkedIn">
+                                <svg viewBox="0 0 24 24"><path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-2-2 2 2 0 0 0-2 2v7h-4v-7a6 6 0 0 1 6-6z"></path><rect x="2" y="9" width="4" height="12"></rect><circle cx="4" cy="4" r="2"></circle></svg>
+                                <span>LinkedIn</span>
+                            </a>
+                            <a href="https://www.instagram.com/srijit_patt/" aria-label="Instagram">
+                                <svg viewBox="0 0 24 24"><rect x="2" y="2" width="20" height="20" rx="5" ry="5"></rect><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"></path><line x1="17.5" y1="6.5" x2="17.51" y2="6.5"></line></svg>
+                                <span>Instagram</span>
+                            </a>
+                            <a href="https://www.facebook.com/profile.php?id=100082193943478" aria-label="Facebook">
+                                <svg viewBox="0 0 24 24"><path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3.81l.39-4h-4.2V7a1 1 0 0 1 1-1h3z"></path></svg>
+                                <span>Facebook</span>
+                            </a>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Minimalist Contact Form via Web3Forms -->
+                <div class="contact-form-container animate-up delay-2">
+                    <form id="contact-form" class="contact-form">
+                        <input type="hidden" name="access_key" value="bdd73f79-afca-4edb-a058-f91caba9aada">
+                        <input type="hidden" name="subject" value="New Submission from Srijit Portfolio">
+                        <input type="checkbox" name="botcheck" style="display: none;">
+
+                        <div class="form-group">
+                            <label for="name">Name</label>
+                            <input type="text" id="name" name="name" required placeholder="Type your Name" autocomplete="off">
+                        </div>
+                        <div class="form-group">
+                            <label for="email">Email address</label>
+                            <input type="email" id="email" name="email" required placeholder="your@email.com" autocomplete="off">
+                        </div>
+                        <div class="form-group">
+                            <label for="message">Message</label>
+                            <textarea id="message" name="message" rows="4" required placeholder="Tell me about your project..."></textarea>
+                        </div>
+                        <button type="submit" class="btn-submit">Send Message</button>
+                    </form>
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <footer>
+        <p>&copy; 2026 Srijit Pattanayak.</p>
+        <p>Built with logic and clean code.</p>
+    </footer>
+
+    <!-- Tooltip Element for Nerd Mode -->
+    <div id="nerd-tooltip"></div>
+
+    <!-- JavaScript for interactive background, slider, and form handling -->
+   <script src="script.js"></script>
+</body>
+</html>
